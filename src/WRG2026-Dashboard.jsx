@@ -1619,7 +1619,7 @@ export default function WRGDashboard(){
                           const koGenerated=!!knockoutData?.[c.id]?.generated;
                           return(
                             <div key={c.id} style={{background:S1,border:`1px solid ${c.color}20`,borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
-                              <div style={{fontSize:11,fontWeight:700,marginBottom:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.icon} {c.name}</div>
+                              <div style={{fontSize:11,fontWeight:700,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.icon} {c.name}</div>
                               <div style={{display:"flex",gap:6,marginBottom:allDone?8:0}}>
                                 {[["GRP",grps],["DONE",`${done}/${total}`],["HOLD",hld]].map(([l,v])=>(
                                   <div key={l} style={{flex:1,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"5px 6px",textAlign:"center"}}>
