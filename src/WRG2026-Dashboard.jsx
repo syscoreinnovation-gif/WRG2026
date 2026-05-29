@@ -514,6 +514,55 @@ export default function WRGDashboard() {
         .fs-score{font-size:clamp(40px,5vw,64px);}
         .fs-field-num{font-size:clamp(36px,5vw,64px);}
 
+        /* ── RESPONSIVE BREAKPOINTS ── */
+
+        /* Desktop: wide layout */
+        @media (min-width:1024px){
+          .layout-main{padding:24px 28px;}
+          .field-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))!important;}
+          .stats-grid{grid-template-columns:repeat(8,1fr)!important;}
+          .cat-bar button{padding:12px 16px!important;font-size:11px!important;}
+          .admin-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .judge-field-grid{display:flex!important;gap:16px!important;flex-wrap:wrap!important;justify-content:center!important;}
+        }
+
+        /* Tablet: medium layout */
+        @media (min-width:640px) and (max-width:1023px){
+          .layout-main{padding:16px 20px;}
+          .field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .stats-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .admin-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-field-grid{display:flex!important;gap:12px!important;flex-wrap:wrap!important;justify-content:center!important;}
+        }
+
+        /* Mobile portrait: single column */
+        @media (max-width:639px){
+          .layout-main{padding:12px 14px;}
+          .field-grid{grid-template-columns:1fr!important;}
+          .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;}
+          .admin-grid{grid-template-columns:1fr!important;}
+          .judge-cat-grid{grid-template-columns:1fr!important;}
+          .judge-field-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:10px!important;}
+          .hide-mobile{display:none!important;}
+          .score-modal-content{padding:20px 16px!important;}
+          .cat-filter-wrap{max-height:80px;overflow-y:auto;}
+          .header-title{font-size:20px!important;}
+          .pin-modal-inner{padding:24px 18px!important;}
+          .pub-tabs button{padding:7px 10px!important;font-size:10px!important;}
+          .match-row{flex-wrap:wrap!important;gap:8px!important;}
+          .match-actions{width:100%!important;justify-content:flex-end!important;}
+          .coming-up-row{flex-wrap:wrap!important;}
+        }
+
+        /* Mobile landscape: 2 cols */
+        @media (max-width:639px) and (orientation:landscape){
+          .field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .stats-grid{grid-template-columns:repeat(4,1fr)!important;}
+        }
+
         .tag{
           display:inline-flex;
           align-items:center;
@@ -558,7 +607,7 @@ export default function WRGDashboard() {
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             {/* Logo with glow */}
             <div style={{position:"relative"}}>
-              <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(20px,2.5vw,28px)",color:"#00d4ff",letterSpacing:4,textShadow:"0 0 20px rgba(0,212,255,0.5),0 0 40px rgba(0,212,255,0.2)"}}>WRG 2026</div>
+              <div className="header-title" style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(20px,2.5vw,28px)",color:"#00d4ff",letterSpacing:4,textShadow:"0 0 20px rgba(0,212,255,0.5),0 0 40px rgba(0,212,255,0.2)"}}>WRG 2026</div>
             </div>
             <div style={{width:1,height:28,background:"rgba(255,255,255,0.1)"}}/>
             <div style={{fontSize:"clamp(9px,1vw,11px)",color:"#4a5f7a",fontWeight:600,letterSpacing:3,textTransform:"uppercase"}}>Malaysia 2026</div>
@@ -610,7 +659,7 @@ export default function WRGDashboard() {
         </div>
       )}
 
-      <main style={{maxWidth:1200,margin:"0 auto",padding:"clamp(12px,2vw,24px) 20px"}}>
+      <main className="layout-main" style={{maxWidth:1200,margin:"0 auto",padding:"clamp(12px,2vw,24px) 20px"}}>
 
         {/* ════════════════════════════════════════
             ADMIN VIEW — SIMPLIFIED
@@ -618,7 +667,7 @@ export default function WRGDashboard() {
         {view==="admin"&&(
           <div className="fadein">
             {/* Admin Tab Bar */}
-            <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
+            <div className="pub-tabs" style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
               {[
                 ["participants","👥 PARTICIPANTS"],
                 ["generate",isGenerated?"🏆 TOURNAMENT":"⚡ GENERATE"],
@@ -660,14 +709,14 @@ export default function WRGDashboard() {
 
                 {/* ADD FORM */}
                 <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:14,marginBottom:14}}>
-                  <div style={{fontSize:10,color:"#475569",fontWeight:700,letterSpacing:2,marginBottom:10}}>+ ADD NEW PARTICIPANT</div>
+                  <div style={{fontSize:"clamp(10px,1vw,12px)",color:"#4a5f7a",fontWeight:700,letterSpacing:1.5,marginBottom:10}}>+ ADD NEW PARTICIPANT</div>
                   <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                     <input value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))}
                       onKeyDown={e=>e.key==="Enter"&&addParticipant()} placeholder="Full name..."
-                      style={{flex:"1 1 160px",background:"rgba(0,0,0,0.3)",backdropFilter:"blur(8px)",border:`1px solid ${addForm.name?"rgba(0,212,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600}}/>
+                      style={{flex:"1 1 160px",background:"rgba(0,0,0,0.3)",backdropFilter:"blur(8px)",border:`1px solid ${addForm.name?"rgba(0,212,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"10px 14px",color:"#e2e8f0",fontFamily:"'Outfit',sans-serif",fontSize:"clamp(13px,1.3vw,15px)",fontWeight:600}}/>
                     <button className="hbtn" style={{padding:"8px 16px",background:addForm.name&&addForm.cats.length?"#00d4ff":"#1e2a45",borderRadius:8,color:addForm.name&&addForm.cats.length?"#0f1525":"#475569",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={addParticipant}>+ ADD</button>
                   </div>
-                  <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:1,marginBottom:6}}>ASSIGN CATEGORIES</div>
+                  <div style={{fontSize:"clamp(10px,1vw,11px)",color:"#4a5f7a",fontWeight:700,letterSpacing:1.5,marginBottom:8,textTransform:"uppercase"}}>Assign Categories</div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                     {CATEGORIES.map(c=>(
                       <button key={c.id} className="hbtn"
@@ -683,10 +732,10 @@ export default function WRGDashboard() {
                     <input value={searchQ} onChange={e=>setSearchQ(e.target.value)}
                       placeholder="🔍 Search by name..."
                       style={{flex:"1 1 150px",background:"rgba(0,0,0,0.3)",backdropFilter:"blur(8px)",border:`1px solid ${searchQ?"rgba(0,212,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Outfit',sans-serif",fontSize:13}}/>
-                    <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    <div className="cat-filter-wrap" style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                       {[["all","ALL"],["present","✓ PRESENT"],["absent","✗ ABSENT"],["unmarked","UNMARKED"]].map(([v,l])=>(
                         <button key={v} className="hbtn"
-                          style={{padding:"6px 10px",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer",
+                          style={{padding:"7px 14px",borderRadius:7,fontSize:"clamp(10px,1.1vw,12px)",fontWeight:700,cursor:"pointer",
                             background:attFilter===v?(v==="present"?"#10b981":v==="absent"?"#ef4444":v==="unmarked"?"#f59e0b":"#00d4ff"):"transparent",
                             border:`1px solid ${attFilter===v?(v==="present"?"#10b981":v==="absent"?"#ef4444":v==="unmarked"?"#f59e0b":"#00d4ff"):BDR}`,
                             color:attFilter===v?"#0f1525":"#64748b"}}
@@ -694,7 +743,7 @@ export default function WRGDashboard() {
                       ))}
                     </div>
                   </div>
-                  <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:1,marginBottom:6}}>FILTER BY CATEGORY</div>
+                  <div style={{fontSize:"clamp(10px,1vw,11px)",color:"#4a5f7a",fontWeight:700,letterSpacing:1.5,marginBottom:8,textTransform:"uppercase"}}>Filter by Category</div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     <button className="hbtn"
                       style={{padding:"3px 9px",borderRadius:4,fontSize:9,fontWeight:700,cursor:"pointer",background:!catFilter?"#00d4ff":"transparent",border:`1px solid ${!catFilter?"#00d4ff":BDR}`,color:!catFilter?"#0f1525":"#475569"}}
@@ -705,7 +754,7 @@ export default function WRGDashboard() {
                         onClick={()=>setCatFilter(catFilter===c.id?null:c.id)}>{c.icon} {c.name}</button>
                     ))}
                   </div>
-                  <div style={{fontSize:10,color:"#475569",marginTop:8}}>{attFiltered.length} participant{attFiltered.length!==1?"s":""} shown</div>
+                  <div style={{fontSize:"clamp(10px,1vw,12px)",color:"#4a5f7a",marginTop:8}}>{attFiltered.length} participant{attFiltered.length!==1?"s":""} shown</div>
                 </div>
 
                 {/* PARTICIPANT LIST */}
@@ -718,7 +767,7 @@ export default function WRGDashboard() {
                       {/* Status dot */}
                       <div style={{width:10,height:10,borderRadius:"50%",background:p.attendance==="present"?"#10b981":p.attendance==="absent"?"#ef4444":"#475569",flexShrink:0}}/>
                       <div style={{flex:1}}>
-                        <div style={{fontWeight:700,fontSize:14,color:p.attendance==="absent"?"#475569":"#e2e8f0"}}>{p.name}</div>
+                        <div style={{fontWeight:700,fontSize:"clamp(13px,1.4vw,16px)",color:p.attendance==="absent"?"#475569":"#e2e8f0"}}>{p.name}</div>
                         <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
                           {p.categories.map(cid=>{
                             const c=CATEGORIES.find(x=>x.id===cid);
@@ -892,11 +941,11 @@ export default function WRGDashboard() {
                         );
                         return(
                           <div key={c.id} style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
-                            <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{c.icon} {c.name}</div>
+                            <div style={{fontSize:"clamp(11px,1.2vw,14px)",fontWeight:700,marginBottom:8}}>{c.icon} {c.name}</div>
                             <div style={{display:"flex",gap:6}}>
                               {[["GRP",grps],["DONE",`${done}/${total}`],["HOLD",onhold]].map(([l,v])=>(
                                 <div key={l} style={{flex:1,background:BG,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
-                                  <div style={{fontSize:8,color:"#475569",fontWeight:700}}>{l}</div>
+                                  <div style={{fontSize:"clamp(8px,0.9vw,10px)",color:"#4a5f7a",fontWeight:700}}>{l}</div>
                                   <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:l==="HOLD"&&onhold>0?"#f59e0b":c.color}}>{v}</div>
                                 </div>
                               ))}
@@ -949,7 +998,7 @@ export default function WRGDashboard() {
               </div>
             ):(
               <>
-                <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
+                <div className="pub-tabs" style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
                   {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"]].map(([t,icon,label])=>(
                     <button key={t} className="hbtn"
                       style={{padding:"8px 16px",borderRadius:9,fontWeight:700,fontSize:"clamp(10px,1.1vw,12px)",letterSpacing:0.8,
@@ -965,7 +1014,7 @@ export default function WRGDashboard() {
                 {/* FIELDS */}
                 {pubTab==="fields"&&(
                   <div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14,marginBottom:24}}>
+                    <div className="field-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14,marginBottom:24}}>
                       {Array.from({length:fieldCfg.count},(_,i)=>i+1).map(f=>{
                         const fd=fieldData[f];
                         const liveConflict=fd.live&&(busyPlayers.has(fd.live.p1)||busyPlayers.has(fd.live.p2));
@@ -1358,7 +1407,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
         <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color:"#00d4ff",letterSpacing:3}}>SELECT YOUR CATEGORY</div>
         <div style={{fontSize:12,color:"#475569",marginTop:4}}>Tap the category you are refereeing today</div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
+      <div className="judge-cat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
         {CATEGORIES.map(c=>{
           const cd=tournamentData[c.id];
           const total=(cd?.matches||[]).length;
@@ -1414,7 +1463,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           <div style={{fontSize:11,color:"#475569"}}>Select your assigned {selFc.label.toLowerCase()}</div>
         </div>
       </div>
-      <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center"}}>
+      <div className="judge-field-grid" style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center"}}>
         {Array.from({length:selFc.count},(_,i)=>i+1).map(num=>{
           const catMap=groupFieldMaps[judgeCategory]||{};
           const cd=tournamentData[judgeCategory];
@@ -1491,7 +1540,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
                   <span style={{fontSize:9,color:"#475569",fontWeight:700,background:BG,padding:"2px 7px",borderRadius:4}}>GROUP {m.group}</span>
                   {conflict&&<span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>⚠ CONFLICT</span>}
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+                <div className="match-row" style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:80}}>
                     <div style={{fontWeight:700,fontSize:15,color:fieldBusy.has(m.p1)?"#f59e0b":"#e2e8f0"}}>{m.p1name}</div>
                   </div>
@@ -1499,7 +1548,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
                   <div style={{flex:1,minWidth:80,textAlign:"right"}}>
                     <div style={{fontWeight:700,fontSize:15,color:fieldBusy.has(m.p2)?"#f59e0b":"#e2e8f0"}}>{m.p2name}</div>
                   </div>
-                  <div style={{display:"flex",gap:8,flexShrink:0}}>
+                  <div className="match-actions" style={{display:"flex",gap:8,flexShrink:0}}>
                     <button style={{padding:"8px 12px",background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.4)",borderRadius:6,color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>holdMatch(m.id)}>⏸ HOLD</button>
                     <button style={{padding:"8px 14px",background:selColor,border:"none",borderRadius:6,color:"#0f1525",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>openScoreModal(m)}>▶ SCORE</button>
                   </div>
