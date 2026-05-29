@@ -346,11 +346,14 @@ export default function WRGDashboard(){
         @media(min-width:769px){
           .mobile-cats{display:none!important;}
           .sidebar-desktop{display:flex!important;}
-          .main-content{margin-left:220px!important;}
           .field-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;}
           .stat-row{grid-template-columns:repeat(4,1fr)!important;}
           .judge-cat-grid{grid-template-columns:repeat(3,1fr)!important;}
           .judge-field-grid{grid-template-columns:repeat(4,1fr)!important;}
+        }
+        @media(min-width:1100px){
+          .judge-cat-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .judge-field-grid{grid-template-columns:repeat(5,1fr)!important;}
         }
         @media(min-width:1100px){
           .field-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))!important;}
@@ -444,7 +447,8 @@ export default function WRGDashboard(){
         )}
 
         {/* ── MAIN CONTENT ── */}
-        <main className="main-content" style={{flex:1,padding:"20px 20px",marginLeft:isGenerated?"220px":"0",minHeight:"calc(100vh - 54px)",transition:"margin .25s"}}>
+        <main className="main-content" style={{flex:1,padding:"20px 28px",marginLeft:isGenerated?"220px":"0",minHeight:"calc(100vh - 54px)",transition:"margin .25s",maxWidth:"100%"}}>
+          <div style={{maxWidth:isGenerated?"1100px":"960px",margin:"0 auto"}}>
 
           {/* FLASH */}
           {flash&&(
@@ -919,6 +923,7 @@ export default function WRGDashboard(){
               )}
             </div>
           )}
+          </div>
         </main>
       </div>
 
