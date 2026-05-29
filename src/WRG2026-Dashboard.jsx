@@ -52,19 +52,96 @@ function generateTournament(participants,groupFieldMaps){
   CATEGORIES.forEach(cat=>{
     const present=participants.filter(p=>p.attendance==="present"&&p.categories.includes(cat.id));
     if(!present.length){catData[cat.id]={groups:{},matches:[]};return;}
-    const sizes=calcGroupSizes(present.length),groups={},matches=[],L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const sizes=calcGroupSizes(present.length),groups={},L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let idx=0;
+    // Build groups and raw matches per group
+    const matchesByField={};
     sizes.forEach((size,gi)=>{
       const label=L[gi],members=present.slice(idx,idx+size);idx+=size;
       groups[label]=members.map(p=>({id:p.id,name:p.name,group:label,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
       const fmap=groupFieldMaps[cat.id]||{},fc=FIELD_CONFIG[cat.id].count,field=fmap[label]||(gi%fc)+1;
-      genRR(members).forEach((pair,mi)=>{
-        matches.push({id:`${cat.id}-${label}-${mi}`,catId:cat.id,group:label,p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,score1:null,score2:null,status:"pending",field});
-      });
+      if(!matchesByField[field])matchesByField[field]={};
+      matchesByField[field][label]=genRR(members).map((pair,mi)=>({
+        id:`${cat.id}-${label}-${mi}`,catId:cat.id,group:label,
+        p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
+        score1:null,score2:null,status:"pending",field
+      }));
     });
-    catData[cat.id]={groups,matches};
+    // Interleave: alternate between groups on same field
+    // Field 1 has Group A & H → A1vA2, H1vH2, A1vA3, H1vH3...
+    const interleavedMatches=[];
+    Object.keys(matchesByField).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
+      const groupArrays=Object.values(matchesByField[field]);
+      const maxLen=Math.max(...groupArrays.map(g=>g.length));
+      for(let i=0;i<maxLen;i++){
+        groupArrays.forEach(grpMatches=>{if(grpMatches[i])interleavedMatches.push(grpMatches[i]);});
+      }
+    });
+    catData[cat.id]={groups,matches:interleavedMatches};
   });
   return catData;
+}
+
+// ── Knockout bracket helpers ──────────────────────────────
+function getRoundName(matchCount){
+  if(matchCount>=16)return`Round of ${matchCount*2}`;
+  if(matchCount===8)return"Round of 16";
+  if(matchCount===4)return"Quarter Finals";
+  if(matchCount===2)return"Semi Finals";
+  return"Final";
+}
+function generateKnockoutBracket(catId,catData){
+  const cd=catData[catId];
+  if(!cd?.matches?.length)return null;
+  if(!cd.matches.every(m=>m.status==="completed"))return null;
+  const standings=calcStandings(cd.groups,cd.matches);
+  const groups=Object.keys(standings).sort();
+  if(groups.length<2)return null;
+  const totalQual=groups.length*2;
+  let bracketSize=2;while(bracketSize<totalQual)bracketSize*=2;
+  // FIFA cross seeding: pair groups (A,B),(C,D)...
+  // 1st A vs 2nd B, 1st B vs 2nd A, 1st C vs 2nd D, 1st D vs 2nd C
+  const r1=[];
+  for(let i=0;i<groups.length;i+=2){
+    const gA=groups[i],gB=groups[i+1];
+    const sA=standings[gA]||[],sB=gB?(standings[gB]||[]):[];
+    if(gB){
+      r1.push({id:`ko-${catId}-0-${r1.length}`,
+        p1:sA[0]?{id:sA[0].id,name:sA[0].name,seed:`1${gA}`}:null,
+        p2:sB[1]?{id:sB[1].id,name:sB[1].name,seed:`2${gB}`}:null,
+        score1:null,score2:null,status:"pending",winnerId:null,winnerName:null,winnerSeed:null});
+      r1.push({id:`ko-${catId}-0-${r1.length}`,
+        p1:sB[0]?{id:sB[0].id,name:sB[0].name,seed:`1${gB}`}:null,
+        p2:sA[1]?{id:sA[1].id,name:sA[1].name,seed:`2${gA}`}:null,
+        score1:null,score2:null,status:"pending",winnerId:null,winnerName:null,winnerSeed:null});
+    } else {
+      const bp=sA[0];
+      r1.push({id:`ko-${catId}-0-${r1.length}`,
+        p1:bp?{id:bp.id,name:bp.name,seed:`1${gA}`}:null,p2:null,
+        score1:1,score2:0,status:"bye",winnerId:bp?.id,winnerName:bp?.name,winnerSeed:`1${gA}`});
+    }
+  }
+  while(r1.length<bracketSize/2){
+    r1.push({id:`ko-${catId}-0-${r1.length}`,p1:null,p2:null,score1:null,score2:null,status:"bye",winnerId:null,winnerName:null,winnerSeed:null});
+  }
+  const rounds=[r1];
+  let prev=r1;
+  while(prev.length>1){
+    const nextCount=Math.ceil(prev.length/2);
+    const next=Array.from({length:nextCount},(_,i)=>({
+      id:`ko-${catId}-${rounds.length}-${i}`,p1:null,p2:null,
+      score1:null,score2:null,status:"waiting",winnerId:null,winnerName:null,winnerSeed:null
+    }));
+    prev.forEach((m,mi)=>{
+      if((m.status==="bye"||m.status==="completed")&&m.winnerId){
+        const ni=Math.floor(mi/2),slot=mi%2===0?"p1":"p2";
+        next[ni][slot]={id:m.winnerId,name:m.winnerName,seed:m.winnerSeed};
+        if(next[ni].p1&&next[ni].p2)next[ni].status="pending";
+      }
+    });
+    rounds.push(next);prev=next;
+  }
+  return{bracketSize,rounds,generated:true};
 }
 function calcStandings(groups,matches){
   const s={};
@@ -114,21 +191,23 @@ export default function WRGDashboard(){
   const [playerSearch,setPlayerSearch] = useState("");
   const [searchResults,setSearchResults] = useState([]);
   const [showSearch,setShowSearch] = useState(false);
+  const [knockoutData,setKnockoutData] = useState({});
+  const [koScoreModal,setKoScoreModal] = useState(null);
+  const [koScoreInput,setKoScoreInput] = useState({s1:"",s2:""});
 
   // ── Save to Firebase ─────────────────────────────────────
   const saveState = async (stateData) => {
     try {
-      console.log("Saving to Firebase...", stateData.participants?.length, "participants");
       await setDoc(STATE_REF, {
         participants: stateData.participants || [],
         groupFieldMaps: stateData.groupFieldMaps || {},
         tournamentData: stateData.tournamentData || null,
+        knockoutData: stateData.knockoutData || {},
         updatedAt: Date.now()
       });
-      console.log("Firebase save successful");
     } catch(e) {
       console.error("Firebase save error:", e);
-      showFlash("⚠ Save failed — check connection");
+      showFlash("⚠ Save failed");
     }
   };
 
@@ -140,6 +219,7 @@ export default function WRGDashboard(){
         if(d.participants) setParticipants(d.participants);
         if(d.groupFieldMaps) setGroupFieldMaps(d.groupFieldMaps);
         setData(d.tournamentData || null);
+        if(d.knockoutData) setKnockoutData(d.knockoutData);
       } else {
         // First time — initialise with empty state
         setParticipants([]);
@@ -266,6 +346,39 @@ export default function WRGDashboard(){
     });
     setSearchResults(results);
   }
+  // ── Knockout functions ──────────────────────────────────
+  function triggerGenerateKnockout(catId){
+    if(!data)return;
+    const bracket=generateKnockoutBracket(catId,data);
+    if(!bracket){showFlash("⚠ Complete all group matches first");return;}
+    const updated={...knockoutData,[catId]:bracket};
+    setKnockoutData(updated);
+    saveState({participants,groupFieldMaps,tournamentData:data,knockoutData:updated});
+    showFlash("🏆 Knockout bracket generated!");
+  }
+  function updateKnockoutScore(catId,roundIdx,matchIdx){
+    const s1=parseInt(koScoreInput.s1),s2=parseInt(koScoreInput.s2);
+    if(isNaN(s1)||isNaN(s2)||s1===s2){showFlash("⚠ No draws in knockout — one must win");return;}
+    const ko=knockoutData[catId];if(!ko)return;
+    const newRounds=ko.rounds.map(r=>[...r]);
+    const m=newRounds[roundIdx][matchIdx];
+    const winnerId=s1>s2?m.p1.id:m.p2.id;
+    const winnerName=s1>s2?m.p1.name:m.p2.name;
+    const winnerSeed=s1>s2?m.p1.seed:m.p2.seed;
+    newRounds[roundIdx][matchIdx]={...m,score1:s1,score2:s2,status:"completed",winnerId,winnerName,winnerSeed};
+    // Auto-advance winner
+    if(newRounds[roundIdx+1]){
+      const ni=Math.floor(matchIdx/2),slot=matchIdx%2===0?"p1":"p2";
+      newRounds[roundIdx+1][ni]={...newRounds[roundIdx+1][ni],[slot]:{id:winnerId,name:winnerName,seed:winnerSeed}};
+      if(newRounds[roundIdx+1][ni].p1&&newRounds[roundIdx+1][ni].p2)newRounds[roundIdx+1][ni].status="pending";
+    }
+    const updated={...knockoutData,[catId]:{...ko,rounds:newRounds}};
+    setKnockoutData(updated);
+    saveState({participants,groupFieldMaps,tournamentData:data,knockoutData:updated});
+    setKoScoreModal(null);
+    showFlash("✓ Score saved — winner advances!");
+  }
+
   function requestView(t){
     if(t==="public"){setView("public");setSidebarOpen(false);return;}
     if(auth[t]){setView(t);setSidebarOpen(false);return;}
@@ -447,19 +560,32 @@ export default function WRGDashboard(){
         /* ── FIELD GRID ── */
         .field-grid{display:grid;gap:12px;}
 
-        /* ── MATCH CARD LAYOUT ── */
-        .match-vs-row{display:flex;align-items:center;gap:8px;width:100%;}
-        .match-vs-row .player-side{flex:1;min-width:0;}
-        .match-vs-row .player-side.right{text-align:right;}
+        /* ── MATCH CARD LAYOUT — vertical stack for long names ── */
+        .match-vs-block{display:flex;flex-direction:column;gap:6px;width:100%;}
+        .match-player{
+          width:100%;
+          padding:6px 10px;
+          background:rgba(0,0,0,0.25);
+          border-radius:7px;
+          border:1px solid rgba(0,230,100,0.08);
+        }
+        .match-player.p2{border-color:rgba(0,230,100,0.06);}
+        .vs-center{
+          display:flex;align-items:center;justify-content:center;
+          gap:8px;padding:2px 0;
+        }
         .vs-badge{
-          flex-shrink:0;
           background:rgba(0,230,100,0.1);
           border:1px solid rgba(0,230,100,0.2);
-          border-radius:6px;padding:5px 8px;
-          font-family:'Bebas Neue';font-size:14px;
-          color:rgba(0,230,100,0.6);letter-spacing:2px;
-          min-width:36px;text-align:center;
+          border-radius:6px;padding:3px 14px;
+          font-family:'Bebas Neue';font-size:13px;
+          color:rgba(0,230,100,0.7);letter-spacing:3px;
         }
+        .vs-line{flex:1;height:1px;background:rgba(0,230,100,0.08);}
+        /* Compact single-line for lists */
+        .match-row-compact{display:flex;align-items:center;gap:6px;width:100%;min-width:0;}
+        .match-row-compact .pname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .match-row-compact .pvs{flex-shrink:0;font-size:9px;color:rgba(0,230,100,0.3);font-weight:700;}
 
         /* ── HORIZONTAL CAT SCROLL (mobile) ── */
         .cat-scroll{
@@ -486,9 +612,7 @@ export default function WRGDashboard(){
           .main-wrap{margin-left:0!important;}
           .main-inner{padding:12px 12px;}
           .field-grid{grid-template-columns:1fr!important;}
-          .match-vs-row{flex-direction:column;gap:6px;align-items:stretch;}
-          .match-vs-row .player-side{text-align:center!important;}
-          .vs-badge{align-self:center;width:60px;}
+          /* match layout is already vertical — no override needed */
           .player-name-lg{font-size:14px!important;}
           .player-name-md{font-size:12px!important;}
           .stat-grid{grid-template-columns:repeat(2,1fr)!important;}
@@ -721,43 +845,49 @@ export default function WRGDashboard(){
                                   ):(<div style={{fontSize:10,fontWeight:600,color:"rgba(0,230,100,0.3)",letterSpacing:1}}>{fd.heldList.length>0?"⏸ HELD":"STANDBY"}</div>)}
                                 </div>
                               </div>
-                              {/* Now Playing */}
+                              {/* Now Playing — VERTICAL STACK */}
                               <div style={{padding:"12px 14px",borderBottom:"1px solid rgba(0,230,100,0.05)"}}>
-                                <div style={{fontSize:8,color:"#ef4444",fontWeight:700,letterSpacing:2,marginBottom:8,textTransform:"uppercase"}}>▶ Now Playing</div>
+                                <div style={{fontSize:8,color:"#ef4444",fontWeight:700,letterSpacing:2,marginBottom:10,textTransform:"uppercase"}}>▶ Now Playing</div>
                                 {fd.live?(
-                                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                    <div style={{flex:1,textAlign:"right"}}>
-                                      <div style={{fontWeight:700,fontSize:"clamp(11px,1.3vw,14px)",color:busyPlayers.has(fd.live.p1)?"#f59e0b":"#e8f5ee",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{fd.live.p1name}</div>
-                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",marginTop:2}}>Group {fd.live.group}</div>
+                                  <div>
+                                    {/* P1 */}
+                                    <div style={{marginBottom:8}}>
+                                      <div style={{fontWeight:700,fontSize:"clamp(13px,1.5vw,15px)",color:busyPlayers.has(fd.live.p1)?"#f59e0b":"#e8f5ee",lineHeight:1.3,wordBreak:"break-word"}}>{fd.live.p1name}</div>
+                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",marginTop:2}}>Group {fd.live.group}</div>
                                     </div>
-                                    <div style={{background:`${accent}18`,border:`1px solid ${accent}30`,borderRadius:8,padding:"5px 10px",textAlign:"center"}}>
-                                      <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:accent,letterSpacing:3}}>VS</div>
+                                    {/* VS divider */}
+                                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                                      <div style={{flex:1,height:1,background:"rgba(0,230,100,0.08)"}}/>
+                                      <div style={{fontFamily:"'Bebas Neue'",fontSize:11,color:accent,letterSpacing:3,padding:"2px 10px",background:`${accent}10`,border:`1px solid ${accent}20`,borderRadius:20}}>VS</div>
+                                      <div style={{flex:1,height:1,background:"rgba(0,230,100,0.08)"}}/>
                                     </div>
-                                    <div style={{flex:1}}>
-                                      <div style={{fontWeight:700,fontSize:"clamp(11px,1.3vw,14px)",color:busyPlayers.has(fd.live.p2)?"#f59e0b":"#e8f5ee",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{fd.live.p2name}</div>
-                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",marginTop:2}}>Group {fd.live.group}</div>
+                                    {/* P2 */}
+                                    <div>
+                                      <div style={{fontWeight:700,fontSize:"clamp(13px,1.5vw,15px)",color:busyPlayers.has(fd.live.p2)?"#f59e0b":"#e8f5ee",lineHeight:1.3,wordBreak:"break-word"}}>{fd.live.p2name}</div>
+                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",marginTop:2}}>Group {fd.live.group}</div>
                                     </div>
                                   </div>
                                 ):(
                                   <div style={{textAlign:"center",padding:"8px",color:"rgba(0,230,100,0.25)",fontSize:12}}>— No match in progress —</div>
                                 )}
                               </div>
-                              {/* Next up */}
+                              {/* Next Up — compact single line with truncation */}
                               <div style={{padding:"8px 14px",background:"rgba(0,0,0,0.2)"}}>
                                 <div style={{fontSize:8,color:"rgba(0,230,100,0.3)",fontWeight:700,letterSpacing:2,marginBottom:5}}>NEXT UP</div>
                                 {fd.next?(
-                                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                    <div style={{flex:1,textAlign:"right",fontSize:11,color:"rgba(232,245,238,0.5)",fontWeight:600}}>{fd.next.p1name}</div>
-                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.3)"}}>vs</div>
-                                    <div style={{flex:1,fontSize:11,color:"rgba(232,245,238,0.5)",fontWeight:600}}>{fd.next.p2name}</div>
+                                  <div>
+                                    <div style={{fontSize:"clamp(10px,1.2vw,12px)",fontWeight:600,color:"rgba(232,245,238,0.55)",lineHeight:1.3,wordBreak:"break-word",marginBottom:3}}>{fd.next.p1name}</div>
+                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.2)",marginBottom:3}}>vs</div>
+                                    <div style={{fontSize:"clamp(10px,1.2vw,12px)",fontWeight:600,color:"rgba(232,245,238,0.55)",lineHeight:1.3,wordBreak:"break-word"}}>{fd.next.p2name}</div>
                                   </div>
                                 ):(<div style={{fontSize:11,color:"rgba(0,230,100,0.2)"}}>— Queue empty —</div>)}
                               </div>
                               {fd.heldList.length>0&&(
                                 <div style={{padding:"7px 14px",background:"rgba(245,158,11,0.05)",borderTop:"1px solid rgba(245,158,11,0.1)"}}>
                                   <div style={{fontSize:8,color:"#f59e0b",fontWeight:700,letterSpacing:2,marginBottom:3}}>⏸ ON HOLD ({fd.heldList.length})</div>
-                                  {fd.heldList.map(m=><div key={m.id} style={{fontSize:10,color:"rgba(245,158,11,0.6)"}}>{m.p1name} vs {m.p2name}</div>)}
+                                  {fd.heldList.map(m=><div key={m.id} style={{fontSize:10,color:"rgba(245,158,11,0.6)",wordBreak:"break-word"}}>{m.p1name} vs {m.p2name}</div>)}
                                 </div>
+                              )}
                               )}
                             </div>
                           );
@@ -782,20 +912,21 @@ export default function WRGDashboard(){
                                   <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>{fp.length} match{fp.length!==1?"es":""}</div>
                                 </div>
                                 {fp.map((m,idx)=>(
-                                  <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:8,background:idx===0?"rgba(0,230,100,0.02)":"transparent"}}>
-                                    <div style={{width:18,height:18,borderRadius:3,background:idx===0?`${accent}20`:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:10,color:idx===0?accent:"rgba(0,230,100,0.25)",flexShrink:0}}>{idx+1}</div>
-                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700,background:"rgba(0,0,0,0.3)",padding:"1px 5px",borderRadius:3,flexShrink:0}}>GRP {m.group}</div>
-                                    <div style={{flex:1,textAlign:"right",fontWeight:600,fontSize:"clamp(10px,1.1vw,12px)",color:idx===0?"rgba(232,245,238,0.8)":"rgba(232,245,238,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.p1name}</div>
-                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.25)",flexShrink:0}}>VS</div>
-                                    <div style={{flex:1,fontWeight:600,fontSize:"clamp(10px,1.1vw,12px)",color:idx===0?"rgba(232,245,238,0.8)":"rgba(232,245,238,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.p2name}</div>
-                                    {idx===0&&<div style={{fontSize:8,color:accent,fontWeight:700,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"1px 6px",borderRadius:3,flexShrink:0}}>NEXT</div>}
+                                  <div key={m.id} className="mrow" style={{padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",background:idx===0?"rgba(0,230,100,0.025)":"transparent"}}>
+                                    {/* Header row */}
+                                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                      <div style={{width:18,height:18,borderRadius:3,background:idx===0?`${accent}20`:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:10,color:idx===0?accent:"rgba(0,230,100,0.25)",flexShrink:0}}>{idx+1}</div>
+                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700,background:"rgba(0,0,0,0.3)",padding:"1px 6px",borderRadius:3}}>GRP {m.group}</div>
+                                      {idx===0&&<div style={{fontSize:8,color:accent,fontWeight:700,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"1px 6px",borderRadius:3,marginLeft:"auto"}}>▶ NEXT</div>}
+                                    </div>
+                                    {/* Player 1 */}
+                                    <div style={{fontWeight:600,fontSize:"clamp(11px,1.2vw,13px)",color:idx===0?"rgba(232,245,238,0.85)":"rgba(232,245,238,0.45)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p1name}</div>
+                                    {/* vs */}
+                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.25)",fontWeight:700,letterSpacing:1,margin:"3px 0"}}>VS</div>
+                                    {/* Player 2 */}
+                                    <div style={{fontWeight:600,fontSize:"clamp(11px,1.2vw,13px)",color:idx===0?"rgba(232,245,238,0.85)":"rgba(232,245,238,0.45)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p2name}</div>
                                   </div>
                                 ))}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
 
                   {/* FIXTURES */}
                   {pubTab==="fixtures"&&Object.keys(catData.groups||{}).map(g=>{
@@ -1001,41 +1132,12 @@ export default function WRGDashboard(){
                   </div>
 
                   {pubTab==="bracket"&&(
-                    <div style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,padding:20,overflowX:"auto"}}>
-                      <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:"rgba(0,230,100,0.3)",letterSpacing:3,marginBottom:16}}>KNOCKOUT BRACKET — POST GROUP STAGE</div>
-                      <div style={{display:"flex",gap:14,alignItems:"center",minWidth:600}}>
-                        {[["R16",8,"sm"],["QF",4,"md"],["SF",2,"lg"]].map(([label,count])=>(
-                          <div key={label}>
-                            <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",letterSpacing:2,fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>{label==="R16"?"Round of 16":label==="QF"?"Quarters":"Semis"}</div>
-                            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                              {Array.from({length:count}).map((_,i)=>(
-                                <div key={i} style={{background:"rgba(0,230,100,0.04)",border:"1px solid rgba(0,230,100,0.1)",borderRadius:6,padding:"5px 10px",width:110}}>
-                                  <div style={{borderBottom:"1px solid rgba(0,230,100,0.06)",paddingBottom:3,marginBottom:3,color:"rgba(0,230,100,0.25)",fontSize:10}}>TBD</div>
-                                  <div style={{color:"rgba(0,230,100,0.12)",fontSize:10}}>TBD</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{color:"rgba(0,230,100,0.2)",fontSize:18}}>›</div>
-                        <div>
-                          <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",letterSpacing:2,fontWeight:700,marginBottom:4}}>FINAL</div>
-                          <div style={{background:`${G}12`,border:`2px solid ${G}35`,borderRadius:8,padding:"10px 12px",width:120}}>
-                            <div style={{borderBottom:`1px solid ${G}20`,paddingBottom:4,marginBottom:4,color:G,fontWeight:700,fontSize:12}}>TBD</div>
-                            <div style={{color:"rgba(0,230,100,0.3)",fontSize:12}}>TBD</div>
-                          </div>
-                        </div>
-                        <div style={{color:G,fontSize:20}}>›</div>
-                        <div style={{textAlign:"center"}}>
-                          <div style={{width:68,height:68,borderRadius:"50%",background:`${G}14`,border:`2px solid ${G}40`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto",boxShadow:`0 0 20px ${G}20`}}>🏆</div>
-                          <div style={{fontFamily:"'Bebas Neue'",fontSize:11,color:G,marginTop:8,letterSpacing:2}}>CHAMPION</div>
-                        </div>
-                      </div>
-                    </div>
+                    <LiveKnockoutBracket catId={activeCat} knockoutData={knockoutData} cat={cat} accent={accent} G={G} S1={S1}
+                      onScoreMatch={(roundIdx,matchIdx)=>{setKoScoreModal({catId:activeCat,roundIdx,matchIdx});setKoScoreInput({s1:"",s2:""});}}
+                      isAdmin={view==="admin"||view==="judge"}
+                      onGenerateKnockout={()=>triggerGenerateKnockout(activeCat)}
+                      groupStageComplete={catMatches.length>0&&catMatches.every(m=>m.status==="completed")}/>
                   )}
-                </>
-              )}
-            </div>
           )}
 
           {/* ═══ JUDGE VIEW ═══ */}
@@ -1281,6 +1383,47 @@ export default function WRGDashboard(){
         </main>
       </div>
 
+      {/* KO SCORE MODAL */}
+      {koScoreModal&&(()=>{
+        const ko=knockoutData[koScoreModal.catId];
+        const m=ko?.rounds?.[koScoreModal.roundIdx]?.[koScoreModal.matchIdx];
+        if(!m)return null;
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
+            onClick={e=>e.target===e.currentTarget&&setKoScoreModal(null)}>
+            <div className="scalein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(30px)",border:"2px solid rgba(255,215,0,0.25)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.7)"}}>
+              <div style={{textAlign:"center",marginBottom:6}}>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:4,color:"#ffd700",textShadow:"0 0 20px rgba(255,215,0,0.4)"}}>🏆 KNOCKOUT MATCH</div>
+                <div style={{fontSize:10,color:"rgba(255,215,0,0.4)",marginTop:4,letterSpacing:1}}>No draws — one must win</div>
+              </div>
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:16,margin:"20px 0"}}>
+                <div style={{textAlign:"center",width:120}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                    <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{m.p1?.name||"TBD"}</span>
+                  </div>
+                  <input type="number" min="0" max="99" value={koScoreInput.s1} autoFocus
+                    onChange={e=>setKoScoreInput(s=>({...s,s1:e.target.value}))} placeholder="0"
+                    style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s1!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
+                </div>
+                <div style={{paddingBottom:14,fontFamily:"'Bebas Neue'",fontSize:20,color:"rgba(255,215,0,0.3)",letterSpacing:3}}>VS</div>
+                <div style={{textAlign:"center",width:120}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                    <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{m.p2?.name||"TBD"}</span>
+                  </div>
+                  <input type="number" min="0" max="99" value={koScoreInput.s2}
+                    onChange={e=>setKoScoreInput(s=>({...s,s2:e.target.value}))} placeholder="0"
+                    style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s2!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button className="hbtn" onClick={()=>setKoScoreModal(null)} style={{flex:1,padding:"12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,color:"rgba(232,245,238,0.3)",fontWeight:700,fontSize:12,cursor:"pointer"}}>CANCEL</button>
+                <button className="hbtn" onMouseDown={()=>updateKnockoutScore(koScoreModal.catId,koScoreModal.roundIdx,koScoreModal.matchIdx)} style={{flex:2,padding:"12px",background:"linear-gradient(135deg,#ffd700,#f59e0b)",border:"none",borderRadius:10,color:"#050e08",fontWeight:700,fontSize:12,cursor:"pointer",boxShadow:"0 4px 18px rgba(255,215,0,0.3)"}}>✓ CONFIRM — ADVANCE WINNER</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* PIN MODAL */}
       {pinModal.open&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.95)",backdropFilter:"blur(12px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:500,padding:20}}
@@ -1318,28 +1461,48 @@ export default function WRGDashboard(){
       {scoreModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
           onClick={e=>e.target===e.currentTarget&&setScoreModal(null)}>
-          <div className="scalein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(30px)",border:`1px solid rgba(0,230,100,0.2)`,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:440,boxShadow:`0 24px 80px rgba(0,0,0,0.7),0 0 40px rgba(0,230,100,0.06)`}}>
+          <div className="scalein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(30px)",border:"1px solid rgba(0,230,100,0.2)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.7),0 0 40px rgba(0,230,100,0.06)"}}>
             <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4,color:G,textShadow:`0 0 20px rgba(0,230,100,0.4)`}}>MATCH RESULT</div>
-              <div style={{fontSize:11,color:"rgba(0,230,100,0.35)",marginTop:4}}>{scoreModal.p1name} vs {scoreModal.p2name}</div>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:4,color:G,textShadow:"0 0 20px rgba(0,230,100,0.4)"}}>MATCH RESULT</div>
             </div>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
-              {[{key:"s1",name:scoreModal.p1name},{key:"s2",name:scoreModal.p2name}].map(({key,name})=>(
-                <div key={key} style={{flex:1,textAlign:"center"}}>
-                  <div style={{fontWeight:600,fontSize:12,marginBottom:10,color:"rgba(232,245,238,0.5)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
-                  <input type="number" min="0" max="99" value={scoreInput[key]}
-                    onChange={e=>setScoreInput(s=>({...s,[key]:e.target.value}))}
-                    placeholder="0"
-                    style={{width:"100%",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",
-                      border:`2px solid ${scoreInput[key]!==""?`rgba(0,230,100,0.5)`:"rgba(0,230,100,0.1)"}`,
-                      borderRadius:12,padding:"16px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:"clamp(44px,6vw,68px)",color:G,
-                      boxShadow:scoreInput[key]!==""?`0 0 20px rgba(0,230,100,0.2)`:"none",transition:"all .2s"}}/>
+            {/* Score inputs — fixed width, names above */}
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:16,marginBottom:24}}>
+              {/* Player 1 */}
+              <div style={{textAlign:"center",width:120}}>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                  <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{scoreModal.p1name}</span>
                 </div>
-              ))}
+                <input type="number" min="0" max="99" value={scoreInput.s1}
+                  onChange={e=>setScoreInput(s=>({...s,s1:e.target.value}))}
+                  placeholder="0" autoFocus
+                  style={{width:120,background:"rgba(0,0,0,0.5)",
+                    border:`2px solid ${scoreInput.s1!==""?"rgba(0,230,100,0.5)":"rgba(0,230,100,0.15)"}`,
+                    borderRadius:12,padding:"14px 0",textAlign:"center",
+                    fontFamily:"'Bebas Neue'",fontSize:64,color:G,
+                    boxShadow:scoreInput.s1!==""?"0 0 20px rgba(0,230,100,0.2)":"none",transition:"all .2s"}}/>
+              </div>
+              {/* VS divider */}
+              <div style={{textAlign:"center",paddingBottom:14}}>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:20,color:"rgba(0,230,100,0.3)",letterSpacing:3}}>VS</div>
+              </div>
+              {/* Player 2 */}
+              <div style={{textAlign:"center",width:120}}>
+                <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                  <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{scoreModal.p2name}</span>
+                </div>
+                <input type="number" min="0" max="99" value={scoreInput.s2}
+                  onChange={e=>setScoreInput(s=>({...s,s2:e.target.value}))}
+                  placeholder="0"
+                  style={{width:120,background:"rgba(0,0,0,0.5)",
+                    border:`2px solid ${scoreInput.s2!==""?"rgba(0,230,100,0.5)":"rgba(0,230,100,0.15)"}`,
+                    borderRadius:12,padding:"14px 0",textAlign:"center",
+                    fontFamily:"'Bebas Neue'",fontSize:64,color:G,
+                    boxShadow:scoreInput.s2!==""?"0 0 20px rgba(0,230,100,0.2)":"none",transition:"all .2s"}}/>
+              </div>
             </div>
             <div style={{display:"flex",gap:10}}>
               <button className="hbtn" onClick={()=>setScoreModal(null)} style={{flex:1,padding:"12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(0,230,100,0.08)",borderRadius:10,color:"rgba(0,230,100,0.3)",fontWeight:700,fontSize:12,cursor:"pointer"}}>CANCEL</button>
-              <button className="hbtn" onMouseDown={submitScore} style={{flex:2,padding:"12px",background:`linear-gradient(135deg,${G},#009944)`,border:"none",borderRadius:10,color:"#050e08",fontWeight:700,fontSize:12,cursor:"pointer",letterSpacing:0.5,boxShadow:`0 4px 18px rgba(0,230,100,0.3)`}}>✓ CONFIRM SCORE</button>
+              <button className="hbtn" onMouseDown={submitScore} style={{flex:2,padding:"12px",background:"linear-gradient(135deg,#00e664,#009944)",border:"none",borderRadius:10,color:"#050e08",fontWeight:700,fontSize:12,cursor:"pointer",boxShadow:"0 4px 18px rgba(0,230,100,0.3)"}}>✓ CONFIRM SCORE</button>
             </div>
           </div>
         </div>
@@ -1546,6 +1709,137 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIVE KNOCKOUT BRACKET
+// ═══════════════════════════════════════════════════════════
+function LiveKnockoutBracket({catId,knockoutData,cat,accent,G,S1,onScoreMatch,isAdmin,onGenerateKnockout,groupStageComplete}){
+  const ko=knockoutData?.[catId];
+  const col=accent||G||"#00e664";
+
+  if(!ko?.generated){
+    return(
+      <div style={{background:S1||"rgba(5,14,8,0.95)",border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,padding:32,textAlign:"center"}}>
+        <div style={{fontSize:48,marginBottom:12}}>🏆</div>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:24,color:col,letterSpacing:3,marginBottom:8}}>KNOCKOUT BRACKET</div>
+        {groupStageComplete?(
+          <div>
+            <div style={{fontSize:13,color:"rgba(0,230,100,0.5)",marginBottom:20}}>Group stage complete! Ready to generate knockout bracket.</div>
+            {isAdmin&&(
+              <button onClick={onGenerateKnockout}
+                style={{padding:"12px 28px",background:`linear-gradient(135deg,${col},#009944)`,border:"none",borderRadius:10,color:"#050e08",fontFamily:"'Bebas Neue'",fontSize:18,letterSpacing:2,cursor:"pointer",boxShadow:`0 4px 20px ${col}40`}}>
+                ⚡ GENERATE KNOCKOUT BRACKET
+              </button>
+            )}
+            {!isAdmin&&<div style={{fontSize:12,color:"rgba(0,230,100,0.35)"}}>Waiting for organiser to generate the bracket...</div>}
+          </div>
+        ):(
+          <div style={{fontSize:13,color:"rgba(0,230,100,0.3)"}}>Bracket will be generated after all group matches complete.</div>
+        )}
+      </div>
+    );
+  }
+
+  const roundNames={16:"Round of 32",8:"Round of 16",4:"Quarter Finals",2:"Semi Finals",1:"Final"};
+  const getRoundName=(matchCount)=>roundNames[matchCount]||`Round of ${matchCount*2}`;
+
+  return(
+    <div style={{overflowX:"auto",paddingBottom:12}}>
+      {/* Bracket info */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:col,letterSpacing:2}}>🏆 {cat?.name} — KNOCKOUT</div>
+        <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",background:"rgba(0,230,100,0.08)",padding:"3px 10px",borderRadius:20,fontWeight:700}}>
+          Round of {ko.bracketSize}
+        </div>
+      </div>
+
+      {/* Bracket rounds — horizontal scroll */}
+      <div style={{display:"flex",gap:16,alignItems:"flex-start",minWidth:"max-content",paddingBottom:8}}>
+        {ko.rounds.map((round,ri)=>{
+          const matchCount=round.length;
+          const isLastRound=ri===ko.rounds.length-1;
+          return(
+            <div key={ri} style={{display:"flex",flexDirection:"column",gap:isLastRound?0:Math.pow(2,ri)*8}}>
+              {/* Round header */}
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:11,color:isLastRound?"#ffd700":col,letterSpacing:2,marginBottom:8,textAlign:"center"}}>
+                {isLastRound?"🏆 FINAL":getRoundName(matchCount)}
+              </div>
+              {/* Matches */}
+              {round.map((m,mi)=>{
+                const canScore=isAdmin&&m.status==="pending"&&m.p1&&m.p2;
+                const isFinal=isLastRound;
+                return(
+                  <div key={m.id} style={{
+                    width:160,
+                    background:m.status==="completed"?"rgba(0,230,100,0.06)":m.status==="bye"?"rgba(0,0,0,0.2)":"rgba(5,14,8,0.95)",
+                    border:`1px solid ${m.status==="completed"?col+"40":m.status==="bye"?"rgba(0,230,100,0.04)":isFinal?"rgba(255,215,0,0.2)":"rgba(0,230,100,0.12)"}`,
+                    borderRadius:8,overflow:"hidden",
+                    boxShadow:m.status==="pending"&&m.p1&&m.p2?`0 2px 12px rgba(0,0,0,0.3)`:"none",
+                    opacity:m.status==="waiting"?0.4:1,
+                    marginBottom:ri===0?0:Math.pow(2,ri)*4
+                  }}>
+                    {/* Match ID tag */}
+                    {m.status!=="bye"&&(
+                      <div style={{padding:"4px 8px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:8,color:"rgba(0,230,100,0.3)",fontWeight:700}}>MATCH {mi+1}</span>
+                        {m.status==="completed"&&<span style={{fontSize:8,color:col,fontWeight:700}}>✓ DONE</span>}
+                        {m.status==="pending"&&m.p1&&m.p2&&<span style={{fontSize:8,color:"#f59e0b",fontWeight:700}}>PENDING</span>}
+                        {m.status==="bye"&&<span style={{fontSize:8,color:"rgba(0,230,100,0.25)"}}>BYE</span>}
+                      </div>
+                    )}
+                    {/* Player 1 */}
+                    <div style={{padding:"6px 8px",borderBottom:"1px solid rgba(0,230,100,0.06)",
+                      background:m.status==="completed"&&m.winnerId===m.p1?.id?`${col}15`:"transparent"}}>
+                      {m.p1?(
+                        <div>
+                          <div style={{fontSize:9,color:col,fontWeight:700,letterSpacing:0.5,marginBottom:2}}>{m.p1.seed}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:m.status==="completed"&&m.winnerId===m.p1.id?col:"rgba(232,245,238,0.8)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p1.name}</div>
+                          {m.status==="completed"&&<div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:m.winnerId===m.p1.id?col:"rgba(232,245,238,0.3)",marginTop:2}}>{m.score1}</div>}
+                        </div>
+                      ):(
+                        <div style={{fontSize:10,color:"rgba(0,230,100,0.2)",padding:"4px 0"}}>— TBD —</div>
+                      )}
+                    </div>
+                    {/* Player 2 */}
+                    <div style={{padding:"6px 8px",
+                      background:m.status==="completed"&&m.winnerId===m.p2?.id?`${col}15`:"transparent"}}>
+                      {m.p2?(
+                        <div>
+                          <div style={{fontSize:9,color:col,fontWeight:700,letterSpacing:0.5,marginBottom:2}}>{m.p2.seed}</div>
+                          <div style={{fontSize:11,fontWeight:700,color:m.status==="completed"&&m.winnerId===m.p2.id?col:"rgba(232,245,238,0.8)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p2.name}</div>
+                          {m.status==="completed"&&<div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:m.winnerId===m.p2.id?col:"rgba(232,245,238,0.3)",marginTop:2}}>{m.score2}</div>}
+                        </div>
+                      ):(
+                        <div style={{fontSize:10,color:"rgba(0,230,100,0.2)",padding:"4px 0"}}>— TBD —</div>
+                      )}
+                    </div>
+                    {/* Score button */}
+                    {canScore&&(
+                      <div style={{padding:"6px 8px",borderTop:"1px solid rgba(0,230,100,0.08)"}}>
+                        <button onClick={()=>onScoreMatch(ri,mi)}
+                          style={{width:"100%",padding:"5px",background:`${isFinal?"rgba(255,215,0,0.12)":"rgba(0,230,100,0.1)"}`,border:`1px solid ${isFinal?"rgba(255,215,0,0.3)":col+"30"}`,borderRadius:5,color:isFinal?"#ffd700":col,fontWeight:700,fontSize:10,cursor:"pointer",letterSpacing:0.5}}>
+                          ▶ SCORE
+                        </button>
+                      </div>
+                    )}
+                    {/* Winner crown */}
+                    {isLastRound&&m.status==="completed"&&m.winnerName&&(
+                      <div style={{padding:"8px",background:"rgba(255,215,0,0.06)",borderTop:"1px solid rgba(255,215,0,0.15)",textAlign:"center"}}>
+                        <div style={{fontSize:16}}>🏆</div>
+                        <div style={{fontSize:9,color:"#ffd700",fontWeight:700,marginTop:2,letterSpacing:1}}>CHAMPION</div>
+                        <div style={{fontSize:11,color:"#ffd700",fontWeight:700,marginTop:2,lineHeight:1.3,wordBreak:"break-word"}}>{m.winnerName}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
