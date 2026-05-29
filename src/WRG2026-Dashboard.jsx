@@ -1013,7 +1013,7 @@ export default function WRGDashboard(){
 
 
                   {/* FIXTURES */}
-                  {pubTab==="fixtures"&&Object.keys(catData.groups||{}).map(g=>{
+                  {pubTab==="fixtures"&&Object.keys(catData.groups||{}).sort().map(g=>{
                     const gm=catMatches.filter(m=>m.group===g);
                     return(
                       <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
@@ -1046,7 +1046,7 @@ export default function WRGDashboard(){
                   })}
 
                   {/* STANDINGS */}
-                  {pubTab==="standings"&&Object.keys(catData.groups||{}).map(g=>{
+                  {pubTab==="standings"&&Object.keys(catData.groups||{}).sort().map(g=>{
                     const rows=standings[g]||[];
                     return(
                       <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
