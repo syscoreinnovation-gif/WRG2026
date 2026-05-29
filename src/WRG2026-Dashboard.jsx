@@ -1243,7 +1243,7 @@ export default function WRGDashboard(){
           {view==="admin"&&(
             <div className="fadein">
               <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",padding:4,borderRadius:10,border:"1px solid rgba(0,230,100,0.08)",width:"fit-content"}}>
-                {[["participants","👥 PARTICIPANTS"],["teams","🏆 TEAMS"],["generate",isGenerated?"🏆 TOURNAMENT":"⚡ GENERATE"]].map(([t,label])=>(
+                {[["participants","👥 PARTICIPANTS"],["teams","🏆 TEAMS"],["generate",isGenerated?"📊 TOURNAMENT":"⚡ GENERATE"]].map(([t,label])=>(
                   <button key={t} className="hbtn"
                     style={{padding:"8px 16px",borderRadius:7,fontWeight:700,fontSize:"clamp(10px,1.1vw,12px)",letterSpacing:0.5,
                       color:adminTab===t?"#050e08":"rgba(0,230,100,0.4)",
