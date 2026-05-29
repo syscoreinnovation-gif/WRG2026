@@ -111,6 +111,9 @@ export default function WRGDashboard(){
   const [judgeField,setJudgeField] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
   const [syncing,setSyncing]       = useState(true);
+  const [playerSearch,setPlayerSearch] = useState("");
+  const [searchResults,setSearchResults] = useState([]);
+  const [showSearch,setShowSearch] = useState(false);
 
   // ── Save to Firebase ─────────────────────────────────────
   const saveState = async (stateData) => {
@@ -190,6 +193,79 @@ export default function WRGDashboard(){
   ,[participants,searchQ,catFilter,attFilter]);
 
   function showFlash(msg){setFlash(msg);setTimeout(()=>setFlash(null),3000);}
+
+  // ── Player search across all categories ─────────────────
+  function searchPlayer(query){
+    setPlayerSearch(query);
+    if(!query.trim()||!data){setSearchResults([]);return;}
+    const q=query.toLowerCase().trim();
+    const results=[];
+    CATEGORIES.forEach(cat=>{
+      const cd=data[cat.id];
+      if(!cd)return;
+      const fc=FIELD_CONFIG[cat.id];
+      // Find all matches involving this player
+      (cd.matches||[]).forEach(m=>{
+        const p1match=m.p1name?.toLowerCase().includes(q);
+        const p2match=m.p2name?.toLowerCase().includes(q);
+        if(!p1match&&!p2match)return;
+        const playerName=p1match?m.p1name:m.p2name;
+        // Check if already added this player for this category
+        if(!results.find(r=>r.playerId===(p1match?m.p1:m.p2)&&r.catId===cat.id)){
+          // Get standings for this player
+          const grpStandings=[];
+          Object.entries(cd.groups||{}).forEach(([g,members])=>{
+            const member=members.find(mb=>mb.id===(p1match?m.p1:m.p2));
+            if(member){
+              const allMatches=(cd.matches||[]).filter(mx=>mx.group===g&&mx.status==="completed");
+              let P=0,W=0,D=0,L=0,GF=0,GA=0,Pts=0;
+              allMatches.forEach(mx=>{
+                const isP1=mx.p1===(p1match?m.p1:m.p2);
+                const isP2=mx.p2===(p1match?m.p1:m.p2);
+                if(!isP1&&!isP2)return;
+                P++;
+                const s=isP1?mx.score1:mx.score2;
+                const o=isP1?mx.score2:mx.score1;
+                GF+=s;GA+=o;
+                if(s>o){W++;Pts+=3;}
+                else if(s<o){L++;}
+                else{D++;Pts++;}
+              });
+              grpStandings.push({group:g,P,W,D,L,GF,GA,GD:GF-GA,Pts});
+            }
+          });
+          // Find next match
+          const nextMatch=(cd.matches||[]).find(mx=>
+            (mx.p1===(p1match?m.p1:m.p2)||mx.p2===(p1match?m.p1:m.p2))&&mx.status==="pending"
+          );
+          const heldMatch=(cd.matches||[]).find(mx=>
+            (mx.p1===(p1match?m.p1:m.p2)||mx.p2===(p1match?m.p1:m.p2))&&mx.status==="held"
+          );
+          const allPlayerMatches=(cd.matches||[]).filter(mx=>
+            mx.p1===(p1match?m.p1:m.p2)||mx.p2===(p1match?m.p1:m.p2)
+          );
+          const completedMatches=allPlayerMatches.filter(mx=>mx.status==="completed");
+          results.push({
+            playerId:p1match?m.p1:m.p2,
+            playerName,
+            catId:cat.id,
+            catName:cat.name,
+            catIcon:cat.icon,
+            catColor:cat.color,
+            group:m.group,
+            field:m.field,
+            fieldLabel:fc.label,
+            nextMatch,
+            heldMatch,
+            totalMatches:allPlayerMatches.length,
+            completedMatches:completedMatches.length,
+            standings:grpStandings[0]||null,
+          });
+        }
+      });
+    });
+    setSearchResults(results);
+  }
   function requestView(t){
     if(t==="public"){setView("public");setSidebarOpen(false);return;}
     if(auth[t]){setView(t);setSidebarOpen(false);return;}
@@ -467,13 +543,16 @@ export default function WRGDashboard(){
               ):(
                 <>
                   {/* Category hero bar */}
-                  <div style={{background:`linear-gradient(135deg,${accent}15,transparent)`,border:`1px solid ${accent}25`,borderRadius:14,padding:"14px 18px",marginBottom:18,display:"flex",alignItems:"center",gap:14}}>
-                    <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(28px,4vw,44px)",color:accent,letterSpacing:3,lineHeight:1,textShadow:`0 0 20px ${accent}50`}}>{cat.icon} {cat.name}</div>
-                    <div style={{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {[["FIELDS",fieldCfg.count,accent],["PENDING",pending.length,"#94a3b8"],["DONE",completed.length,"#10b981"],["ON HOLD",held.length,held.length>0?"#f59e0b":"#4a7a5a"]].map(([l,v,c])=>(
-                        <div key={l} style={{textAlign:"center",padding:"6px 12px",background:"rgba(0,0,0,0.3)",borderRadius:8,border:`1px solid ${c}20`}}>
-                          <div style={{fontSize:8,color:c,fontWeight:700,letterSpacing:1.5,opacity:0.7}}>{l}</div>
-                          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color:c,lineHeight:1}}>{v}</div>
+                  <div style={{background:`linear-gradient(135deg,${accent}15,transparent)`,border:`1px solid ${accent}25`,borderRadius:14,padding:"14px 18px",marginBottom:18}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                      <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(22px,3.5vw,40px)",color:accent,letterSpacing:3,lineHeight:1,textShadow:`0 0 20px ${accent}50`}}>{cat.icon} {cat.name}</div>
+                      {isGenerated&&<div style={{fontSize:9,color:accent,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>{fieldCfg.count} {fieldCfg.label}{fieldCfg.count>1?"S":""}</div>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+                      {[["PENDING",pending.length,"#94a3b8"],["DONE",completed.length,"#10b981"],["ON HOLD",held.length,held.length>0?"#f59e0b":"#4a7a5a"],[`${fieldCfg.label}S`,fieldCfg.count,accent]].map(([l,v,c])=>(
+                        <div key={l} style={{textAlign:"center",padding:"8px 6px",background:"rgba(0,0,0,0.3)",borderRadius:8,border:`1px solid ${c}20`}}>
+                          <div style={{fontSize:"clamp(7px,0.8vw,9px)",color:c,fontWeight:700,letterSpacing:1,opacity:0.7}}>{l}</div>
+                          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",color:c,lineHeight:1.1}}>{v}</div>
                         </div>
                       ))}
                     </div>
@@ -524,14 +603,14 @@ export default function WRGDashboard(){
                                 {fd.live?(
                                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                                     <div style={{flex:1,textAlign:"right"}}>
-                                      <div style={{fontWeight:700,fontSize:"clamp(12px,1.4vw,15px)",color:busyPlayers.has(fd.live.p1)?"#f59e0b":"#e8f5ee"}}>{fd.live.p1name}</div>
+                                      <div style={{fontWeight:700,fontSize:"clamp(11px,1.3vw,14px)",color:busyPlayers.has(fd.live.p1)?"#f59e0b":"#e8f5ee",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{fd.live.p1name}</div>
                                       <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",marginTop:2}}>Group {fd.live.group}</div>
                                     </div>
                                     <div style={{background:`${accent}18`,border:`1px solid ${accent}30`,borderRadius:8,padding:"5px 10px",textAlign:"center"}}>
                                       <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:accent,letterSpacing:3}}>VS</div>
                                     </div>
                                     <div style={{flex:1}}>
-                                      <div style={{fontWeight:700,fontSize:"clamp(12px,1.4vw,15px)",color:busyPlayers.has(fd.live.p2)?"#f59e0b":"#e8f5ee"}}>{fd.live.p2name}</div>
+                                      <div style={{fontWeight:700,fontSize:"clamp(11px,1.3vw,14px)",color:busyPlayers.has(fd.live.p2)?"#f59e0b":"#e8f5ee",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>{fd.live.p2name}</div>
                                       <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",marginTop:2}}>Group {fd.live.group}</div>
                                     </div>
                                   </div>
@@ -595,7 +674,7 @@ export default function WRGDashboard(){
                         </div>
                         {gm.map(m=>(
                           <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:10,background:m.status==="held"?"rgba(245,158,11,0.03)":"transparent"}}>
-                            <div style={{flex:1,textAlign:"right",fontWeight:600,fontSize:"clamp(11px,1.3vw,14px)"}}>{m.p1name}</div>
+                            <div style={{flex:1,textAlign:"right",fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p1name}</div>
                             <div style={{width:84,textAlign:"center"}}>
                               {m.status==="completed"?(
                                 <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4}}>
@@ -609,7 +688,7 @@ export default function WRGDashboard(){
                                 <span style={{fontSize:9,color:"rgba(0,230,100,0.25)",background:"rgba(0,230,100,0.05)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>PENDING</span>
                               )}
                             </div>
-                            <div style={{flex:1,fontWeight:600,fontSize:"clamp(11px,1.3vw,14px)"}}>{m.p2name}</div>
+                            <div style={{flex:1,fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p2name}</div>
                           </div>
                         ))}
                       </div>
@@ -637,7 +716,7 @@ export default function WRGDashboard(){
                                 <td style={{padding:"8px 10px",textAlign:"center",color:i<2?accent:"rgba(0,230,100,0.3)",fontWeight:700,fontSize:13}}>{i+1}</td>
                                 <td style={{padding:"8px 10px",fontWeight:600,fontSize:12}}>
                                   {i<2&&<span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:accent,marginRight:7,verticalAlign:"middle"}}/>}
-                                  {r.name}
+                                  <span style={{fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)"}}>{r.name}</span>
                                 </td>
                                 {["P","W","D","L","GF","GA","GD","Pts"].map(k=>(
                                   <td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:k==="Pts"?700:400,
@@ -653,6 +732,138 @@ export default function WRGDashboard(){
                       </div>
                     );
                   })}
+
+                  {/* ── PLAYER SEARCH BAR ── */}
+                  <div style={{marginBottom:18}}>
+                    <div style={{position:"relative"}}>
+                      <input
+                        value={playerSearch}
+                        onChange={e=>searchPlayer(e.target.value)}
+                        onFocus={()=>setShowSearch(true)}
+                        placeholder="🔍  Search your child's name..."
+                        style={{width:"100%",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(12px)",
+                          border:`1px solid ${playerSearch?"rgba(0,230,100,0.4)":"rgba(0,230,100,0.15)"}`,
+                          borderRadius:10,padding:"12px 16px",color:"#e8f5ee",
+                          fontFamily:"'Barlow',sans-serif",fontSize:"clamp(13px,1.4vw,15px)",
+                          transition:"all .2s",boxShadow:playerSearch?"0 0 16px rgba(0,230,100,0.1)":"none"}}/>
+                      {playerSearch&&(
+                        <button onClick={()=>{setPlayerSearch("");setSearchResults([]);setShowSearch(false);}}
+                          style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",
+                            background:"transparent",border:"none",color:"rgba(0,230,100,0.4)",
+                            fontSize:18,cursor:"pointer",lineHeight:1}}>×</button>
+                      )}
+                    </div>
+
+                    {/* Search Results */}
+                    {showSearch&&searchResults.length>0&&(
+                      <div className="fadein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(20px)",
+                        border:"1px solid rgba(0,230,100,0.2)",borderRadius:12,marginTop:8,overflow:"hidden",
+                        boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+                        <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.08)",
+                          fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:2}}>
+                          {searchResults.length} RESULT{searchResults.length!==1?"S":""} FOUND
+                        </div>
+                        {searchResults.map((r,i)=>(
+                          <div key={i} style={{padding:"14px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",
+                            background:i%2===0?"transparent":"rgba(0,230,100,0.02)"}}>
+                            {/* Player name + category */}
+                            <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
+                              <div style={{flex:1}}>
+                                <div style={{fontWeight:700,fontSize:"clamp(15px,2vw,18px)",color:"#e8f5ee",lineHeight:1.2,marginBottom:4}}>
+                                  {r.playerName}
+                                </div>
+                                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                                  <span style={{fontSize:10,color:r.catColor,background:`${r.catColor}15`,
+                                    border:`1px solid ${r.catColor}30`,padding:"2px 8px",borderRadius:4,fontWeight:700}}>
+                                    {r.catIcon} {r.catName}
+                                  </span>
+                                  <span style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:600}}>
+                                    Group {r.group}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status cards */}
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8}}>
+                              {/* Current / Next match */}
+                              {r.nextMatch?(
+                                <div style={{background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.15)",
+                                  borderRadius:8,padding:"10px 12px"}}>
+                                  <div style={{fontSize:8,color:"rgba(0,230,100,0.5)",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>NEXT MATCH</div>
+                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",marginBottom:4,fontWeight:600}}>
+                                    {r.fieldLabel} {r.nextMatch.field} · Group {r.nextMatch.group}
+                                  </div>
+                                  <div style={{fontSize:"clamp(11px,1.3vw,13px)",fontWeight:700,color:"#e8f5ee",lineHeight:1.3}}>
+                                    vs {r.nextMatch.p1===r.playerId?r.nextMatch.p2name:r.nextMatch.p1name}
+                                  </div>
+                                </div>
+                              ):r.heldMatch?(
+                                <div style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)",
+                                  borderRadius:8,padding:"10px 12px"}}>
+                                  <div style={{fontSize:8,color:"#f59e0b",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>⏸ ON HOLD</div>
+                                  <div style={{fontSize:"clamp(11px,1.3vw,13px)",fontWeight:700,color:"#f59e0b",lineHeight:1.3}}>
+                                    vs {r.heldMatch.p1===r.playerId?r.heldMatch.p2name:r.heldMatch.p1name}
+                                  </div>
+                                </div>
+                              ):(
+                                <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.15)",
+                                  borderRadius:8,padding:"10px 12px"}}>
+                                  <div style={{fontSize:8,color:"#10b981",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>GROUP STAGE</div>
+                                  <div style={{fontSize:"clamp(11px,1.3vw,13px)",color:"#10b981",fontWeight:700}}>
+                                    ✓ All matches complete
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Standings */}
+                              {r.standings&&(
+                                <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(0,230,100,0.1)",
+                                  borderRadius:8,padding:"10px 12px"}}>
+                                  <div style={{fontSize:8,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>STANDINGS</div>
+                                  <div style={{display:"flex",gap:8}}>
+                                    {[["PTS",r.standings.Pts,"#00e664"],["W",r.standings.W,"#10b981"],["D",r.standings.D,"#94a3b8"],["L",r.standings.L,"#ef4444"]].map(([l,v,c])=>(
+                                      <div key={l} style={{textAlign:"center"}}>
+                                        <div style={{fontFamily:"'Bebas Neue'",fontSize:20,color:c,lineHeight:1}}>{v}</div>
+                                        <div style={{fontSize:7,color:c,opacity:0.6,fontWeight:700,letterSpacing:0.5}}>{l}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Progress */}
+                              <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(0,230,100,0.08)",
+                                borderRadius:8,padding:"10px 12px"}}>
+                                <div style={{fontSize:8,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:6}}>PROGRESS</div>
+                                <div style={{fontSize:"clamp(12px,1.5vw,15px)",color:"#e8f5ee",fontWeight:700}}>{r.completedMatches}/{r.totalMatches}</div>
+                                <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",marginTop:2}}>matches played</div>
+                                <div style={{marginTop:6,height:4,background:"rgba(0,230,100,0.1)",borderRadius:2,overflow:"hidden"}}>
+                                  <div style={{height:"100%",width:`${r.totalMatches>0?(r.completedMatches/r.totalMatches)*100:0}%`,
+                                    background:"linear-gradient(90deg,#00e664,#009944)",borderRadius:2,transition:"width .3s"}}/>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showSearch&&playerSearch&&searchResults.length===0&&(
+                      <div className="fadein" style={{background:"rgba(5,14,8,0.95)",border:"1px solid rgba(0,230,100,0.1)",
+                        borderRadius:10,marginTop:8,padding:"20px",textAlign:"center"}}>
+                        <div style={{fontSize:24,marginBottom:8}}>🔍</div>
+                        <div style={{fontSize:13,color:"rgba(0,230,100,0.4)",fontWeight:600}}>No student found for "{playerSearch}"</div>
+                        <div style={{fontSize:11,color:"rgba(0,230,100,0.25)",marginTop:4}}>Check spelling or try a shorter name</div>
+                      </div>
+                    )}
+
+                    {!isGenerated&&playerSearch&&(
+                      <div style={{fontSize:11,color:"rgba(0,230,100,0.3)",marginTop:8,textAlign:"center"}}>
+                        Search will be available once the tournament is generated
+                      </div>
+                    )}
+                  </div>
 
                   {pubTab==="bracket"&&(
                     <div style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,padding:20,overflowX:"auto"}}>
