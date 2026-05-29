@@ -42,11 +42,37 @@ function calcGroupSizes(n){
   const g=Math.ceil(n/6),b=Math.floor(n/g),e=n%g;
   return Array.from({length:g},(_,i)=>b+(i<e?1:0));
 }
-function genRR(members){
-  const p=[];
-  for(let i=0;i<members.length;i++)for(let j=i+1;j<members.length;j++)p.push([members[i],members[j]]);
-  return p;
+// ── Berger table round-robin scheduling ─────────────────────
+// Generates rounds where NO player appears twice in the same round
+// Players get maximum rest between matches
+function genRRRounds(members){
+  const n=members.length;
+  if(n<2)return[];
+  // Pad to even number
+  const players=n%2===0?[...members]:[...members,null];
+  const m=players.length;
+  const fixed=players[0];
+  const rest=players.slice(1); // m-1 players, will rotate
+  const rounds=[];
+  for(let r=0;r<m-1;r++){
+    // Rotate rest array by r positions (Berger / circle method)
+    const rotated=rest.map((_,i)=>rest[(i+r)%rest.length]);
+    const round=[];
+    // Fixed player vs last in rotation
+    const opp=rotated[rotated.length-1];
+    if(fixed&&opp)round.push([fixed,opp]);
+    // Pair first half vs mirrored second half
+    const halfLen=Math.floor((rotated.length-1)/2);
+    for(let i=0;i<halfLen;i++){
+      const p1=rotated[i];
+      const p2=rotated[rotated.length-2-i];
+      if(p1&&p2)round.push([p1,p2]);
+    }
+    if(round.length>0)rounds.push(round);
+  }
+  return rounds;
 }
+
 function generateTournament(participants,groupFieldMaps){
   const catData={};
   CATEGORIES.forEach(cat=>{
@@ -54,27 +80,41 @@ function generateTournament(participants,groupFieldMaps){
     if(!present.length){catData[cat.id]={groups:{},matches:[]};return;}
     const sizes=calcGroupSizes(present.length),groups={},L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let idx=0;
-    // Build groups and raw matches per group
-    const matchesByField={};
+    // Build per-field, per-group round schedules
+    const fieldGroupRounds={}; // {field: {groupLabel: [[match,...], [match,...], ...]}}
     sizes.forEach((size,gi)=>{
       const label=L[gi],members=present.slice(idx,idx+size);idx+=size;
       groups[label]=members.map(p=>({id:p.id,name:p.name,group:label,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
       const fmap=groupFieldMaps[cat.id]||{},fc=FIELD_CONFIG[cat.id].count,field=fmap[label]||(gi%fc)+1;
-      if(!matchesByField[field])matchesByField[field]={};
-      matchesByField[field][label]=genRR(members).map((pair,mi)=>({
-        id:`${cat.id}-${label}-${mi}`,catId:cat.id,group:label,
-        p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
-        score1:null,score2:null,status:"pending",field
-      }));
+      if(!fieldGroupRounds[field])fieldGroupRounds[field]={};
+      // Generate Berger rounds for this group
+      fieldGroupRounds[field][label]=genRRRounds(members).map((round,ri)=>
+        round.map((pair,mi)=>({
+          id:`${cat.id}-${label}-${ri}-${mi}`,catId:cat.id,group:label,
+          p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
+          score1:null,score2:null,status:"pending",field
+        }))
+      );
     });
-    // Interleave: alternate between groups on same field
-    // Field 1 has Group A & H → A1vA2, H1vH2, A1vA3, H1vH3...
+    // Interleave by ROUND then by MATCH within round
+    // Round 1: GroupA-M1, GroupH-M1, GroupA-M2, GroupH-M2, GroupA-M3, GroupH-M3
+    // Round 2: GroupA-M1, GroupH-M1, GroupA-M2, GroupH-M2, ...
+    // This ensures max rest: player rests for (groupCount * matchesPerRound) - 1 matches
     const interleavedMatches=[];
-    Object.keys(matchesByField).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
-      const groupArrays=Object.values(matchesByField[field]);
-      const maxLen=Math.max(...groupArrays.map(g=>g.length));
-      for(let i=0;i<maxLen;i++){
-        groupArrays.forEach(grpMatches=>{if(grpMatches[i])interleavedMatches.push(grpMatches[i]);});
+    Object.keys(fieldGroupRounds).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
+      const groupLabels=Object.keys(fieldGroupRounds[field]);
+      const allGroupRounds=fieldGroupRounds[field];
+      const maxRounds=Math.max(...groupLabels.map(g=>allGroupRounds[g].length));
+      for(let ri=0;ri<maxRounds;ri++){
+        // Get this round's match arrays for each group
+        const roundPerGroup=groupLabels.map(g=>allGroupRounds[g][ri]||[]);
+        const maxMatchesInRound=Math.max(...roundPerGroup.map(m=>m.length));
+        // Interleave: for each match slot, take one from each group
+        for(let mi=0;mi<maxMatchesInRound;mi++){
+          roundPerGroup.forEach(groupMatches=>{
+            if(groupMatches[mi])interleavedMatches.push(groupMatches[mi]);
+          });
+        }
       }
     });
     catData[cat.id]={groups,matches:interleavedMatches};
