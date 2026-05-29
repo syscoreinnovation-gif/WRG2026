@@ -763,28 +763,39 @@ export default function WRGDashboard(){
                           );
                         })}
                       </div>
-                      {/* Coming Up */}
+                      {/* Coming Up - ALL fields */}
                       <div style={{background:S1,backdropFilter:"blur(16px)",borderRadius:14,overflow:"hidden",border:"1px solid rgba(0,230,100,0.08)"}}>
                         <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(0,230,100,0.07)",display:"flex",alignItems:"center",gap:10,background:"linear-gradient(90deg,rgba(0,230,100,0.06),transparent)"}}>
-                          <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:G,letterSpacing:3}}>COMING UP</div>
-                          <div style={{fontSize:10,color:"rgba(0,230,100,0.35)"}}>Next 6 in queue</div>
+                          <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:G,letterSpacing:3}}>UPCOMING MATCHES — ALL FIELDS</div>
                           <div style={{marginLeft:"auto",fontSize:10,color:"rgba(0,230,100,0.3)"}}>{pending.length} pending</div>
                         </div>
-                        {comingUp.length===0?(
-                          <div style={{padding:"20px",textAlign:"center",color:"rgba(0,230,100,0.25)",fontSize:12}}>✅ All matches assigned</div>
-                        ):comingUp.map((m,idx)=>(
-                          <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.04)",gap:10}}>
-                            <div style={{width:22,height:22,borderRadius:5,background:`${accent}15`,border:`1px solid ${accent}25`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:13,color:accent,flexShrink:0}}>{idx+1}</div>
-                            <div style={{fontSize:9,color:accent,fontWeight:700,background:`${accent}12`,padding:"2px 7px",borderRadius:4,flexShrink:0,letterSpacing:0.5}}>{fieldCfg.label} {m.field}</div>
-                            <div style={{flex:1,textAlign:"right",fontWeight:600,fontSize:12,color:"rgba(232,245,238,0.6)"}}>{m.p1name}</div>
-                            <div style={{fontSize:10,color:"rgba(0,230,100,0.3)"}}>vs</div>
-                            <div style={{flex:1,fontWeight:600,fontSize:12,color:"rgba(232,245,238,0.6)"}}>{m.p2name}</div>
-                            <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",background:"rgba(0,0,0,0.3)",padding:"2px 7px",borderRadius:4,flexShrink:0}}>GRP {m.group}</div>
-                          </div>
-                        ))}
+                        {pending.length===0?(
+                          <div style={{padding:"20px",textAlign:"center",color:"rgba(0,230,100,0.25)",fontSize:12}}>✅ All matches complete</div>
+                        ):(
+                          Array.from({length:fieldCfg.count},(_,i)=>i+1).map(f=>{
+                            const fp=pending.filter(m=>m.field===f);
+                            if(!fp.length) return null;
+                            return(
+                              <div key={f}>
+                                <div style={{padding:"7px 16px",background:`${accent}07`,borderBottom:"1px solid rgba(0,230,100,0.05)",borderTop:"1px solid rgba(0,230,100,0.04)",display:"flex",alignItems:"center",gap:8}}>
+                                  <div style={{fontFamily:"'Bebas Neue'",fontSize:13,color:accent,letterSpacing:2}}>{fieldCfg.label} {f}</div>
+                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>{fp.length} match{fp.length!==1?"es":""}</div>
+                                </div>
+                                {fp.map((m,idx)=>(
+                                  <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"8px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:8,background:idx===0?"rgba(0,230,100,0.02)":"transparent"}}>
+                                    <div style={{width:18,height:18,borderRadius:3,background:idx===0?`${accent}20`:"rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:10,color:idx===0?accent:"rgba(0,230,100,0.25)",flexShrink:0}}>{idx+1}</div>
+                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700,background:"rgba(0,0,0,0.3)",padding:"1px 5px",borderRadius:3,flexShrink:0}}>GRP {m.group}</div>
+                                    <div style={{flex:1,textAlign:"right",fontWeight:600,fontSize:"clamp(10px,1.1vw,12px)",color:idx===0?"rgba(232,245,238,0.8)":"rgba(232,245,238,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.p1name}</div>
+                                    <div style={{fontSize:9,color:"rgba(0,230,100,0.25)",flexShrink:0}}>VS</div>
+                                    <div style={{flex:1,fontWeight:600,fontSize:"clamp(10px,1.1vw,12px)",color:idx===0?"rgba(232,245,238,0.8)":"rgba(232,245,238,0.45)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.p2name}</div>
+                                    {idx===0&&<div style={{fontSize:8,color:accent,fontWeight:700,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"1px 6px",borderRadius:3,flexShrink:0}}>NEXT</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
-                    </div>
-                  )}
 
                   {/* FIXTURES */}
                   {pubTab==="fixtures"&&Object.keys(catData.groups||{}).map(g=>{
@@ -1057,16 +1068,19 @@ export default function WRGDashboard(){
               {adminTab==="participants"&&(
                 <div>
                   {/* Stats */}
-                  <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+                  <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
                     {[["TOTAL",participants.length,"rgba(0,230,100,0.5)"],["✓ PRESENT",presentCount,"#10b981"],["✗ ABSENT",absentCount,"#ef4444"],["UNMARKED",unmarkedCount,"#f59e0b"]].map(([l,v,c])=>(
-                      v>0||l==="TOTAL"?<div key={l} style={{fontSize:11,color:c,fontWeight:700,background:`rgba(0,0,0,0.4)`,border:`1px solid ${c}25`,padding:"5px 12px",borderRadius:6}}>{l}: {v}</div>:null
+                      v>0||l==="TOTAL"?<div key={l} style={{fontSize:11,color:c,fontWeight:700,background:"rgba(0,0,0,0.4)",border:`1px solid ${c}25`,padding:"5px 12px",borderRadius:6}}>{l}: {v}</div>:null
                     ))}
-                    <button className="hbtn" style={{marginLeft:"auto",padding:"7px 14px",background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",borderRadius:7,color:"#10b981",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllPresent}>✓ ALL PRESENT</button>
-                    <button className="hbtn" style={{padding:"7px 14px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:7,color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllAbsent}>✗ ALL ABSENT</button>
+                  </div>
+                  {/* Action buttons */}
+                  <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+                    <button className="hbtn" style={{padding:"8px 16px",background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",borderRadius:7,color:"#10b981",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllPresent}>✓ ALL PRESENT</button>
+                    <button className="hbtn" style={{padding:"8px 16px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:7,color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllAbsent}>✗ ALL ABSENT</button>
                     <button className="hbtn"
-                      style={{padding:"7px 14px",background:"rgba(239,68,68,0.05)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:7,color:"rgba(239,68,68,0.6)",fontWeight:700,fontSize:11,cursor:"pointer"}}
-                      onClick={()=>{if(window.confirm(`Clear ALL ${participants.length} participants? This cannot be undone.`)){clearAllParticipants();}}}>
-                      🗑 CLEAR ALL
+                      style={{padding:"8px 18px",background:"rgba(239,68,68,0.06)",border:"2px solid rgba(239,68,68,0.4)",borderRadius:7,color:"#ef4444",fontWeight:700,fontSize:12,cursor:"pointer",marginLeft:"auto"}}
+                      onClick={()=>{if(window.confirm("Clear ALL "+participants.length+" participants? This cannot be undone.")){clearAllParticipants();}}}>
+                      🗑 CLEAR ALL PARTICIPANTS
                     </button>
                   </div>
 
