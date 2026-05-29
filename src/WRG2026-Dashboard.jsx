@@ -829,7 +829,7 @@ export default function WRGDashboard(){
                   <div style={{fontSize:13,color:"rgba(0,230,100,0.4)",marginTop:12}}>Please wait while the organiser finalises the setup</div>
                 </div>
               ):(
-                <>
+                <div>
                   {/* Category hero bar */}
                   <div style={{background:`linear-gradient(135deg,${accent}15,transparent)`,border:`1px solid ${accent}25`,borderRadius:14,padding:"14px 18px",marginBottom:18}}>
                     <div className="hero-bar" style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
@@ -966,6 +966,14 @@ export default function WRGDashboard(){
                                     <div style={{fontWeight:600,fontSize:"clamp(11px,1.2vw,13px)",color:idx===0?"rgba(232,245,238,0.85)":"rgba(232,245,238,0.45)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p2name}</div>
                                   </div>
                                 ))}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
 
                   {/* FIXTURES */}
                   {pubTab==="fixtures"&&Object.keys(catData.groups||{}).map(g=>{
@@ -1177,7 +1185,11 @@ export default function WRGDashboard(){
                       onGenerateKnockout={()=>triggerGenerateKnockout(activeCat)}
                       groupStageComplete={catMatches.length>0&&catMatches.every(m=>m.status==="completed")}/>
                   )}
+                </div>  
+              )}
+            </div>
           )}
+
 
           {/* ═══ JUDGE VIEW ═══ */}
           {view==="judge"&&(
@@ -1423,45 +1435,15 @@ export default function WRGDashboard(){
       </div>
 
       {/* KO SCORE MODAL */}
-      {koScoreModal&&(()=>{
-        const ko=knockoutData[koScoreModal.catId];
-        const m=ko?.rounds?.[koScoreModal.roundIdx]?.[koScoreModal.matchIdx];
-        if(!m)return null;
-        return(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
-            onClick={e=>e.target===e.currentTarget&&setKoScoreModal(null)}>
-            <div className="scalein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(30px)",border:"2px solid rgba(255,215,0,0.25)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.7)"}}>
-              <div style={{textAlign:"center",marginBottom:6}}>
-                <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:4,color:"#ffd700",textShadow:"0 0 20px rgba(255,215,0,0.4)"}}>🏆 KNOCKOUT MATCH</div>
-                <div style={{fontSize:10,color:"rgba(255,215,0,0.4)",marginTop:4,letterSpacing:1}}>No draws — one must win</div>
-              </div>
-              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:16,margin:"20px 0"}}>
-                <div style={{textAlign:"center",width:120}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                    <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{m.p1?.name||"TBD"}</span>
-                  </div>
-                  <input type="number" min="0" max="99" value={koScoreInput.s1} autoFocus
-                    onChange={e=>setKoScoreInput(s=>({...s,s1:e.target.value}))} placeholder="0"
-                    style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s1!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
-                </div>
-                <div style={{paddingBottom:14,fontFamily:"'Bebas Neue'",fontSize:20,color:"rgba(255,215,0,0.3)",letterSpacing:3}}>VS</div>
-                <div style={{textAlign:"center",width:120}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-                    <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{m.p2?.name||"TBD"}</span>
-                  </div>
-                  <input type="number" min="0" max="99" value={koScoreInput.s2}
-                    onChange={e=>setKoScoreInput(s=>({...s,s2:e.target.value}))} placeholder="0"
-                    style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s2!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:10}}>
-                <button className="hbtn" onClick={()=>setKoScoreModal(null)} style={{flex:1,padding:"12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,color:"rgba(232,245,238,0.3)",fontWeight:700,fontSize:12,cursor:"pointer"}}>CANCEL</button>
-                <button className="hbtn" onMouseDown={()=>updateKnockoutScore(koScoreModal.catId,koScoreModal.roundIdx,koScoreModal.matchIdx)} style={{flex:2,padding:"12px",background:"linear-gradient(135deg,#ffd700,#f59e0b)",border:"none",borderRadius:10,color:"#050e08",fontWeight:700,fontSize:12,cursor:"pointer",boxShadow:"0 4px 18px rgba(255,215,0,0.3)"}}>✓ CONFIRM — ADVANCE WINNER</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {koScoreModal&&knockoutData?.[koScoreModal.catId]?.rounds?.[koScoreModal.roundIdx]?.[koScoreModal.matchIdx]&&(
+        <KOScoreModal
+          match={knockoutData[koScoreModal.catId].rounds[koScoreModal.roundIdx][koScoreModal.matchIdx]}
+          koScoreInput={koScoreInput}
+          setKoScoreInput={setKoScoreInput}
+          onCancel={()=>setKoScoreModal(null)}
+          onConfirm={()=>updateKnockoutScore(koScoreModal.catId,koScoreModal.roundIdx,koScoreModal.matchIdx)}
+        />
+      )}
 
       {/* PIN MODAL */}
       {pinModal.open&&(
@@ -1748,6 +1730,43 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// KO SCORE MODAL COMPONENT
+// ═══════════════════════════════════════════════════════════
+function KOScoreModal({match,koScoreInput,setKoScoreInput,onCancel,onConfirm}){
+  const m=match;
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:20}}
+      onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div className="scalein" style={{background:"rgba(5,14,8,0.98)",backdropFilter:"blur(30px)",border:"2px solid rgba(255,215,0,0.25)",borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.7)"}}>
+        <div style={{textAlign:"center",marginBottom:6}}>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:4,color:"#ffd700",textShadow:"0 0 20px rgba(255,215,0,0.4)"}}>KNOCKOUT MATCH</div>
+          <div style={{fontSize:10,color:"rgba(255,215,0,0.4)",marginTop:4,letterSpacing:1}}>No draws allowed — one must win</div>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:16,margin:"20px 0"}}>
+          <div style={{textAlign:"center",width:120}}>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,wordBreak:"break-word"}}>{m.p1?.name||"TBD"}</div>
+            <input type="number" min="0" max="99" value={koScoreInput.s1} autoFocus
+              onChange={e=>setKoScoreInput(s=>({...s,s1:e.target.value}))} placeholder="0"
+              style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s1!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
+          </div>
+          <div style={{paddingBottom:14,fontFamily:"'Bebas Neue'",fontSize:20,color:"rgba(255,215,0,0.3)",letterSpacing:3}}>VS</div>
+          <div style={{textAlign:"center",width:120}}>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(232,245,238,0.6)",marginBottom:8,lineHeight:1.3,minHeight:34,wordBreak:"break-word"}}>{m.p2?.name||"TBD"}</div>
+            <input type="number" min="0" max="99" value={koScoreInput.s2}
+              onChange={e=>setKoScoreInput(s=>({...s,s2:e.target.value}))} placeholder="0"
+              style={{width:120,background:"rgba(0,0,0,0.5)",border:`2px solid ${koScoreInput.s2!==""?"rgba(255,215,0,0.5)":"rgba(255,215,0,0.15)"}`,borderRadius:12,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:64,color:"#ffd700",transition:"all .2s"}}/>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button className="hbtn" onClick={onCancel} style={{flex:1,padding:"12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:10,color:"rgba(232,245,238,0.3)",fontWeight:700,fontSize:12,cursor:"pointer"}}>CANCEL</button>
+          <button className="hbtn" onMouseDown={onConfirm} style={{flex:2,padding:"12px",background:"linear-gradient(135deg,#ffd700,#f59e0b)",border:"none",borderRadius:10,color:"#050e08",fontWeight:700,fontSize:12,cursor:"pointer",boxShadow:"0 4px 18px rgba(255,215,0,0.3)"}}>CONFIRM — ADVANCE WINNER</button>
+        </div>
+      </div>
     </div>
   );
 }
