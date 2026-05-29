@@ -884,7 +884,7 @@ export default function WRGDashboard(){
 
                   {/* Public tabs */}
                   <div style={{display:"flex",gap:4,marginBottom:18,background:"rgba(0,0,0,0.4)",padding:4,borderRadius:10,border:"1px solid rgba(0,230,100,0.08)",width:"fit-content"}}>
-                    {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"],...(TEAM_CATEGORIES[activeCat]?[["teams","👥","TEAMS"]]:[])] .map(([t,icon,label])=>(
+                    {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"],...(["open2","soc4","drone"].includes(activeCat)?[["teams","👥","TEAMS"]]:[])] .map(([t,icon,label])=>(
                       <button key={t} className="hbtn"
                         style={{padding:"7px 14px",borderRadius:8,fontWeight:700,fontSize:"clamp(9px,1vw,11px)",letterSpacing:0.8,
                           color:pubTab===t?"#050e08":"rgba(0,230,100,0.45)",
