@@ -948,7 +948,7 @@ export default function WRGDashboard(){
                               <div key={f}>
                                 <div style={{padding:"7px 16px",background:`${accent}07`,borderBottom:"1px solid rgba(0,230,100,0.05)",borderTop:"1px solid rgba(0,230,100,0.04)",display:"flex",alignItems:"center",gap:8}}>
                                   <div style={{fontFamily:"'Bebas Neue'",fontSize:13,color:accent,letterSpacing:2}}>{fieldCfg.label} {f}</div>
-                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>{fp.length} match{fp.length!==1?"es":""}</div>
+                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>Next {Math.min(3,fp.length)} of {fp.length}</div>
                                 </div>
                                 {fp.slice(0,3).map((m,idx)=>(
                                   <div key={m.id} className="mrow" style={{padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",background:idx===0?"rgba(0,230,100,0.025)":"transparent"}}>
