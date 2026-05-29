@@ -349,64 +349,260 @@ export default function WRGDashboard() {
   const unmarkedCount = participants.filter(p=>!p.attendance).length;
 
   return (
-    <div style={{fontFamily:"'Rajdhani',sans-serif",background:BG,minHeight:"100vh",color:"#e2e8f0"}}>
+    <div style={{fontFamily:"'Outfit',sans-serif",background:BG,minHeight:"100vh",color:"#e2e8f0"}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap');
+
         *{box-sizing:border-box;margin:0;padding:0}
-        .hbtn{cursor:pointer;border:none;transition:all .2s;font-family:'Rajdhani',sans-serif}
-        .hbtn:hover{opacity:.85;transform:translateY(-1px)}
-        .mrow:hover{background:rgba(255,255,255,.04)!important}
-        .fadein{animation:fi .3s ease}
-        @keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        .blink{animation:bk 1.5s infinite}
-        @keyframes bk{0%,100%{opacity:1}50%{opacity:.3}}
-        .shake{animation:sk .5s ease}
-        @keyframes sk{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-        input:focus{outline:none}
-        input::-webkit-inner-spin-button{-webkit-appearance:none}
-        ::-webkit-scrollbar{height:4px;width:4px}
-        ::-webkit-scrollbar-track{background:#0f1525}
-        ::-webkit-scrollbar-thumb{background:#1e2a45;border-radius:2px}
+
+        :root{
+          --bg:#030912;
+          --surf:rgba(12,20,38,0.85);
+          --surf2:rgba(18,30,55,0.7);
+          --bdr:rgba(255,255,255,0.07);
+          --bdr2:rgba(255,255,255,0.12);
+          --text:#e2e8f0;
+          --muted:#4a5f7a;
+          --font:'Outfit',sans-serif;
+          --font-display:'Bebas Neue',sans-serif;
+          --shadow:0 8px 32px rgba(0,0,0,0.5),0 2px 8px rgba(0,0,0,0.3);
+          --shadow-lg:0 20px 60px rgba(0,0,0,0.6),0 8px 24px rgba(0,0,0,0.4);
+          --radius:12px;
+          --radius-lg:16px;
+        }
+
+        html,body,#root{
+          height:100%;
+          font-family:var(--font);
+          background:var(--bg);
+          background-image:
+            radial-gradient(ellipse at 15% 40%,rgba(0,212,255,0.04) 0%,transparent 55%),
+            radial-gradient(ellipse at 85% 15%,rgba(139,92,246,0.04) 0%,transparent 55%),
+            radial-gradient(ellipse at 50% 85%,rgba(255,77,141,0.03) 0%,transparent 55%);
+          background-attachment:fixed;
+        }
+
+        body::before{
+          content:'';
+          position:fixed;
+          inset:0;
+          background-image:
+            linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
+          background-size:60px 60px;
+          pointer-events:none;
+          z-index:0;
+        }
+
+        #root{position:relative;z-index:1;}
+
+        .glass{
+          background:var(--surf);
+          backdrop-filter:blur(20px);
+          -webkit-backdrop-filter:blur(20px);
+          border:1px solid var(--bdr);
+          box-shadow:var(--shadow);
+        }
+        .glass2{
+          background:var(--surf2);
+          backdrop-filter:blur(12px);
+          -webkit-backdrop-filter:blur(12px);
+          border:1px solid var(--bdr2);
+          box-shadow:var(--shadow);
+        }
+
+        .hbtn{
+          cursor:pointer;
+          border:none;
+          transition:all .18s cubic-bezier(.4,0,.2,1);
+          font-family:var(--font);
+          position:relative;
+          overflow:hidden;
+        }
+        .hbtn::after{
+          content:'';
+          position:absolute;
+          inset:0;
+          background:rgba(255,255,255,0);
+          transition:background .18s;
+        }
+        .hbtn:hover::after{background:rgba(255,255,255,0.06);}
+        .hbtn:active::after{background:rgba(255,255,255,0.12);}
+        .hbtn:hover{transform:translateY(-1px);}
+        .hbtn:active{transform:translateY(0);}
+
+        .mrow{transition:background .15s;}
+        .mrow:hover{background:rgba(255,255,255,0.035)!important;}
+
+        .card-hover{transition:all .2s cubic-bezier(.4,0,.2,1);}
+        .card-hover:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)!important;}
+
+        .fadein{animation:fi .35s cubic-bezier(.4,0,.2,1) both;}
+        @keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+        .slidein{animation:si .3s cubic-bezier(.4,0,.2,1) both;}
+        @keyframes si{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+
+        .scalein{animation:sci .3s cubic-bezier(.34,1.56,.64,1) both;}
+        @keyframes sci{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+
+        .blink{animation:bk 2s ease-in-out infinite;}
+        @keyframes bk{0%,100%{opacity:1}50%{opacity:.2}}
+
+        .livepulse{
+          animation:lp 2s ease-in-out infinite;
+        }
+        @keyframes lp{
+          0%{box-shadow:0 0 0 0 rgba(239,68,68,0.6);}
+          70%{box-shadow:0 0 0 12px rgba(239,68,68,0);}
+          100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}
+        }
+
+        .glow{filter:drop-shadow(0 0 8px currentColor);}
+
+        .shake{animation:sk .5s cubic-bezier(.36,.07,.19,.97) both;}
+        @keyframes sk{
+          10%,90%{transform:translateX(-2px)}
+          20%,80%{transform:translateX(4px)}
+          30%,50%,70%{transform:translateX(-6px)}
+          40%,60%{transform:translateX(6px)}
+        }
+
+        .stat-card{
+          position:relative;
+          overflow:hidden;
+        }
+        .stat-card::before{
+          content:'';
+          position:absolute;
+          top:0;left:0;right:0;
+          height:2px;
+          background:linear-gradient(90deg,transparent,currentColor,transparent);
+          opacity:0.6;
+        }
+
+        .score-input{
+          background:rgba(0,0,0,0.4)!important;
+          backdrop-filter:blur(8px);
+          border-radius:12px!important;
+          transition:all .2s!important;
+          text-align:center;
+          letter-spacing:4px;
+        }
+        .score-input:focus{
+          outline:none;
+          box-shadow:0 0 0 2px currentColor, 0 0 20px rgba(0,212,255,0.3)!important;
+        }
+
+        input:focus{outline:none;}
+        input::-webkit-inner-spin-button{-webkit-appearance:none;}
+        textarea:focus{outline:none;}
+
+        ::-webkit-scrollbar{height:4px;width:4px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
+        ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2);}
+
+        .fs-xs{font-size:clamp(9px,0.9vw,11px);}
+        .fs-sm{font-size:clamp(11px,1.1vw,13px);}
+        .fs-md{font-size:clamp(13px,1.3vw,16px);}
+        .fs-lg{font-size:clamp(15px,1.5vw,18px);}
+        .fs-xl{font-size:clamp(18px,2vw,24px);}
+        .fs-2xl{font-size:clamp(22px,2.5vw,30px);}
+        .fs-3xl{font-size:clamp(28px,3vw,40px);}
+        .fs-stat{font-size:clamp(20px,2.2vw,28px);}
+        .fs-score{font-size:clamp(40px,5vw,64px);}
+        .fs-field-num{font-size:clamp(36px,5vw,64px);}
+
+        .tag{
+          display:inline-flex;
+          align-items:center;
+          padding:2px 8px;
+          border-radius:4px;
+          font-weight:700;
+          letter-spacing:0.5px;
+        }
+
+        .badge-live{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          padding:4px 12px;
+          border-radius:20px;
+          background:rgba(239,68,68,0.15);
+          border:1px solid rgba(239,68,68,0.4);
+          color:#ef4444;
+          font-weight:700;
+          font-size:clamp(9px,1vw,11px);
+          letter-spacing:1.5px;
+          text-transform:uppercase;
+        }
+        .badge-hold{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          padding:4px 12px;
+          border-radius:20px;
+          background:rgba(245,158,11,0.15);
+          border:1px solid rgba(245,158,11,0.4);
+          color:#f59e0b;
+          font-weight:700;
+          font-size:clamp(9px,1vw,11px);
+          letter-spacing:1.5px;
+        }
       `}</style>
 
       {/* ── HEADER ── */}
-      <header style={{background:SURF,borderBottom:`1px solid ${BDR}`,padding:"0 20px",position:"sticky",top:0,zIndex:100}}>
-        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:58}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{fontFamily:"'Bebas Neue'",fontSize:24,color:"#00d4ff",letterSpacing:3}}>WRG 2026</div>
-            <div style={{width:1,height:28,background:BDR}}/>
-            <div style={{fontSize:11,color:"#475569",fontWeight:700,letterSpacing:2}}>MALAYSIA 2026</div>
-            {isGenerated&&<div style={{fontSize:10,background:"rgba(16,185,129,.15)",color:"#10b981",border:"1px solid rgba(16,185,129,.3)",padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>● LIVE</div>}
-            {!isGenerated&&<div style={{fontSize:10,background:"rgba(245,158,11,.15)",color:"#f59e0b",border:"1px solid rgba(245,158,11,.3)",padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>⚙ SETUP</div>}
+      <header style={{background:"rgba(3,9,18,0.9)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderBottom:"1px solid rgba(255,255,255,0.07)",padding:"0 20px",position:"sticky",top:0,zIndex:100,boxShadow:"0 4px 24px rgba(0,0,0,0.4)"}}>
+        <div style={{maxWidth:1200,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:60}}>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            {/* Logo with glow */}
+            <div style={{position:"relative"}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(20px,2.5vw,28px)",color:"#00d4ff",letterSpacing:4,textShadow:"0 0 20px rgba(0,212,255,0.5),0 0 40px rgba(0,212,255,0.2)"}}>WRG 2026</div>
+            </div>
+            <div style={{width:1,height:28,background:"rgba(255,255,255,0.1)"}}/>
+            <div style={{fontSize:"clamp(9px,1vw,11px)",color:"#4a5f7a",fontWeight:600,letterSpacing:3,textTransform:"uppercase"}}>Malaysia 2026</div>
+            {isGenerated&&(
+              <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.25)",padding:"3px 10px",borderRadius:20}}>
+                <div className="blink" style={{width:6,height:6,borderRadius:"50%",background:"#10b981",boxShadow:"0 0 6px #10b981"}}/>
+                <span style={{fontSize:"clamp(8px,0.9vw,10px)",color:"#10b981",fontWeight:700,letterSpacing:1.5}}>LIVE</span>
+              </div>
+            )}
+            {!isGenerated&&(
+              <div style={{fontSize:"clamp(8px,0.9vw,10px)",background:"rgba(245,158,11,0.1)",color:"#f59e0b",border:"1px solid rgba(245,158,11,0.2)",padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>⚙ SETUP</div>
+            )}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{display:"flex",gap:4,background:BG,padding:4,borderRadius:8,border:`1px solid ${BDR}`}}>
-              {[["public","👁 PUBLIC"],["judge",`${auth.judge?"📋":"🔒"} JUDGE`],["admin",`${auth.admin?"⚙":"🔒"} ADMIN`]].map(([v,label])=>(
+            <div style={{display:"flex",gap:3,background:"rgba(0,0,0,0.4)",padding:4,borderRadius:10,border:"1px solid rgba(255,255,255,0.07)"}}>
+              {[["public","👁","PUBLIC"],["judge",auth.judge?"📋":"🔒","JUDGE"],["admin",auth.admin?"⚙":"🔒","ADMIN"]].map(([v,icon,label])=>(
                 <button key={v} className="hbtn"
-                  style={{padding:"7px 14px",borderRadius:6,fontWeight:700,fontSize:12,color:view===v?"#0f1525":"#64748b",background:view===v?"#00d4ff":"transparent"}}
-                  onClick={()=>requestView(v)}>{label}</button>
+                  style={{padding:"7px 14px",borderRadius:7,fontWeight:700,fontSize:"clamp(10px,1.1vw,12px)",letterSpacing:0.5,color:view===v?"#030912":"#4a5f7a",background:view===v?"#00d4ff":"transparent",transition:"all .2s"}}
+                  onClick={()=>requestView(v)}>{icon} {label}</button>
               ))}
             </div>
             {(view==="judge"||view==="admin")&&(
-              <button className="hbtn" style={{padding:"7px 12px",borderRadius:6,fontWeight:700,fontSize:11,color:"#ef4444",background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)"}} onClick={lockView}>🔒 LOCK</button>
+              <button className="hbtn" style={{padding:"7px 13px",borderRadius:8,fontWeight:700,fontSize:"clamp(10px,1vw,11px)",color:"#ef4444",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",letterSpacing:0.5}} onClick={lockView}>🔒 LOCK</button>
             )}
           </div>
         </div>
       </header>
 
       {/* ── FLASH ── */}
-      {flash&&<div className="fadein" style={{position:"fixed",top:70,right:20,background:SURF,border:"1px solid #00d4ff",color:"#00d4ff",padding:"10px 20px",borderRadius:8,fontWeight:700,zIndex:999,fontSize:13}}>{flash}</div>}
+      {flash&&(
+        <div className="fadein" style={{position:"fixed",top:70,right:20,background:"rgba(0,212,255,0.1)",backdropFilter:"blur(20px)",border:"1px solid rgba(0,212,255,0.3)",color:"#00d4ff",padding:"10px 20px",borderRadius:10,fontWeight:700,zIndex:999,fontSize:"clamp(11px,1.2vw,13px)",boxShadow:"0 8px 32px rgba(0,0,0,0.4),0 0 20px rgba(0,212,255,0.1)",letterSpacing:0.3}}>{flash}</div>
+      )}
 
-      {/* ── CATEGORY BAR (only when tournament generated) ── */}
+      {/* ── CATEGORY BAR ── */}
       {isGenerated&&(
-        <div style={{background:SURF,borderBottom:`1px solid ${BDR}`,overflowX:"auto"}}>
+        <div style={{background:"rgba(3,9,18,0.7)",backdropFilter:"blur(12px)",borderBottom:"1px solid rgba(255,255,255,0.06)",overflowX:"auto"}}>
           <div style={{maxWidth:1200,margin:"0 auto",display:"flex"}}>
             {CATEGORIES.map(c=>(
               <button key={c.id} className="hbtn"
-                style={{padding:"10px 14px",background:"transparent",border:"none",borderBottom:activeCat===c.id?`3px solid ${c.color}`:"3px solid transparent",color:activeCat===c.id?c.color:"#475569",fontWeight:700,fontSize:11,whiteSpace:"nowrap",cursor:"pointer"}}
+                style={{padding:"11px 14px",background:"transparent",border:"none",borderBottom:activeCat===c.id?`3px solid ${c.color}`:"3px solid transparent",color:activeCat===c.id?c.color:"#4a5f7a",fontWeight:700,fontSize:"clamp(9px,1vw,11px)",whiteSpace:"nowrap",cursor:"pointer",letterSpacing:0.3,transition:"all .2s",
+                  textShadow:activeCat===c.id?`0 0 12px ${c.color}60`:"none"}}
                 onClick={()=>setActiveCat(c.id)}>{c.icon} {c.name}
                 {tournamentData?.[c.id]?.matches?.filter(m=>m.status==="held").length>0&&
-                  <span style={{marginLeft:5,fontSize:9,background:"rgba(245,158,11,.3)",color:"#f59e0b",padding:"1px 5px",borderRadius:8}}>HOLD</span>
+                  <span style={{marginLeft:5,fontSize:8,background:"rgba(245,158,11,.25)",color:"#f59e0b",padding:"1px 6px",borderRadius:8,fontWeight:700}}>HOLD</span>
                 }
               </button>
             ))}
@@ -414,7 +610,7 @@ export default function WRGDashboard() {
         </div>
       )}
 
-      <main style={{maxWidth:1200,margin:"0 auto",padding:"20px"}}>
+      <main style={{maxWidth:1200,margin:"0 auto",padding:"clamp(12px,2vw,24px) 20px"}}>
 
         {/* ════════════════════════════════════════
             ADMIN VIEW — SIMPLIFIED
@@ -422,7 +618,7 @@ export default function WRGDashboard() {
         {view==="admin"&&(
           <div className="fadein">
             {/* Admin Tab Bar */}
-            <div style={{display:"flex",gap:4,marginBottom:20,background:SURF,padding:4,borderRadius:10,border:`1px solid ${BDR}`,width:"fit-content"}}>
+            <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
               {[
                 ["participants","👥 PARTICIPANTS"],
                 ["generate",isGenerated?"🏆 TOURNAMENT":"⚡ GENERATE"],
@@ -463,12 +659,12 @@ export default function WRGDashboard() {
                 />
 
                 {/* ADD FORM */}
-                <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,padding:14,marginBottom:14}}>
+                <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:14,marginBottom:14}}>
                   <div style={{fontSize:10,color:"#475569",fontWeight:700,letterSpacing:2,marginBottom:10}}>+ ADD NEW PARTICIPANT</div>
                   <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                     <input value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))}
                       onKeyDown={e=>e.key==="Enter"&&addParticipant()} placeholder="Full name..."
-                      style={{flex:"1 1 160px",background:BG,border:`1px solid ${addForm.name?"#00d4ff":BDR}`,borderRadius:8,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Rajdhani',sans-serif",fontSize:14,fontWeight:600}}/>
+                      style={{flex:"1 1 160px",background:"rgba(0,0,0,0.3)",backdropFilter:"blur(8px)",border:`1px solid ${addForm.name?"rgba(0,212,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:8,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Outfit',sans-serif",fontSize:14,fontWeight:600}}/>
                     <button className="hbtn" style={{padding:"8px 16px",background:addForm.name&&addForm.cats.length?"#00d4ff":"#1e2a45",borderRadius:8,color:addForm.name&&addForm.cats.length?"#0f1525":"#475569",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={addParticipant}>+ ADD</button>
                   </div>
                   <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:1,marginBottom:6}}>ASSIGN CATEGORIES</div>
@@ -482,11 +678,11 @@ export default function WRGDashboard() {
                 </div>
 
                 {/* SEARCH + FILTERS */}
-                <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:10,padding:"12px 14px",marginBottom:12}}>
+                <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
                   <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                     <input value={searchQ} onChange={e=>setSearchQ(e.target.value)}
                       placeholder="🔍 Search by name..."
-                      style={{flex:"1 1 150px",background:BG,border:`1px solid ${searchQ?"#00d4ff":BDR}`,borderRadius:7,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Rajdhani',sans-serif",fontSize:13}}/>
+                      style={{flex:"1 1 150px",background:"rgba(0,0,0,0.3)",backdropFilter:"blur(8px)",border:`1px solid ${searchQ?"rgba(0,212,255,0.4)":"rgba(255,255,255,0.1)"}`,borderRadius:7,padding:"8px 12px",color:"#e2e8f0",fontFamily:"'Outfit',sans-serif",fontSize:13}}/>
                     <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                       {[["all","ALL"],["present","✓ PRESENT"],["absent","✗ ABSENT"],["unmarked","UNMARKED"]].map(([v,l])=>(
                         <button key={v} className="hbtn"
@@ -513,7 +709,7 @@ export default function WRGDashboard() {
                 </div>
 
                 {/* PARTICIPANT LIST */}
-                <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,overflow:"hidden"}}>
+                <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,overflow:"hidden"}}>
                   {attFiltered.length===0?(
                     <div style={{padding:"28px",textAlign:"center",color:"#475569",fontSize:13}}>No participants match your filters</div>
                   ):attFiltered.map(p=>(
@@ -545,7 +741,7 @@ export default function WRGDashboard() {
                             color:p.attendance==="absent"?"#fff":"#ef4444"}}
                           onClick={()=>markAttendance(p.id,"absent")}>✗</button>
                         <button className="hbtn"
-                          style={{padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:"transparent",border:`1px solid ${BDR}`,color:"#475569"}}
+                          style={{padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:"transparent",border:"1px solid rgba(255,255,255,0.07)",color:"#475569"}}
                           onClick={()=>removeParticipant(p.id)}>🗑</button>
                       </div>
                     </div>
@@ -571,7 +767,7 @@ export default function WRGDashboard() {
                     )}
 
                     {/* Category breakdown */}
-                    <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,overflow:"hidden",marginBottom:20}}>
+                    <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,overflow:"hidden",marginBottom:20}}>
                       <div style={{padding:"10px 18px",borderBottom:`1px solid ${BDR}`,display:"grid",gridTemplateColumns:"1fr 80px 80px 80px",gap:10}}>
                         {["CATEGORY","REGISTERED","PRESENT","GROUPS"].map(h=>(
                           <div key={h} style={{fontSize:10,color:"#475569",fontWeight:700,letterSpacing:1}}>{h}</div>
@@ -593,7 +789,7 @@ export default function WRGDashboard() {
                     </div>
 
                     {/* ── FIELD LOAD BALANCER ── */}
-                    <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,overflow:"hidden",marginBottom:20}}>
+                    <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,overflow:"hidden",marginBottom:20}}>
                       <div style={{padding:"12px 18px",borderBottom:`1px solid ${BDR}`,background:"rgba(0,212,255,.05)"}}>
                         <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:"#00d4ff",letterSpacing:2,marginBottom:2}}>🗂 ASSIGN GROUPS TO FIELDS</div>
                         <div style={{fontSize:11,color:"#475569"}}>Distribute groups evenly across fields. Tap a field number to reassign.</div>
@@ -689,13 +885,13 @@ export default function WRGDashboard() {
                         const onhold=(cd?.matches||[]).filter(m=>m.status==="held").length;
                         const grps=Object.keys(cd?.groups||{}).length;
                         if(!total) return(
-                          <div key={c.id} style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:10,padding:14,opacity:0.4}}>
+                          <div key={c.id} style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:14,opacity:0.4}}>
                             <div style={{fontSize:12,fontWeight:700,color:"#475569"}}>{c.icon} {c.name}</div>
                             <div style={{fontSize:11,color:"#3a4a65",marginTop:4}}>No participants</div>
                           </div>
                         );
                         return(
-                          <div key={c.id} style={{background:SURF,border:`1px solid ${BDR}`,borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
+                          <div key={c.id} style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
                             <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>{c.icon} {c.name}</div>
                             <div style={{display:"flex",gap:6}}>
                               {[["GRP",grps],["DONE",`${done}/${total}`],["HOLD",onhold]].map(([l,v])=>(
@@ -753,11 +949,16 @@ export default function WRGDashboard() {
               </div>
             ):(
               <>
-                <div style={{display:"flex",gap:4,marginBottom:18,background:SURF,padding:4,borderRadius:8,border:`1px solid ${BDR}`,width:"fit-content"}}>
-                  {["fields","fixtures","standings","bracket"].map(t=>(
+                <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(12px)",padding:4,borderRadius:12,border:"1px solid rgba(255,255,255,0.08)",width:"fit-content"}}>
+                  {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"]].map(([t,icon,label])=>(
                     <button key={t} className="hbtn"
-                      style={{padding:"8px 16px",borderRadius:6,fontWeight:700,fontSize:12,letterSpacing:1,color:pubTab===t?"#0f1525":"#64748b",background:pubTab===t?accent:"transparent",textTransform:"uppercase",cursor:"pointer"}}
-                      onClick={()=>setPubTab(t)}>{t==="fields"?"🏟 FIELDS":t}</button>
+                      style={{padding:"8px 16px",borderRadius:9,fontWeight:700,fontSize:"clamp(10px,1.1vw,12px)",letterSpacing:0.8,
+                        color:pubTab===t?"#030912":"#4a5f7a",
+                        background:pubTab===t?accent:"transparent",
+                        textShadow:pubTab===t?"none":"none",
+                        boxShadow:pubTab===t?`0 2px 12px ${accent}40`:"none",
+                        cursor:"pointer",transition:"all .2s"}}
+                      onClick={()=>setPubTab(t)}>{icon} {label}</button>
                   ))}
                 </div>
 
@@ -769,17 +970,27 @@ export default function WRGDashboard() {
                         const fd=fieldData[f];
                         const liveConflict=fd.live&&(busyPlayers.has(fd.live.p1)||busyPlayers.has(fd.live.p2));
                         return(
-                          <div key={f} style={{background:SURF,border:`2px solid ${fd.heldList.length>0?"#f59e0b60":fd.live?accent+"60":BDR}`,borderRadius:12,overflow:"hidden"}}>
-                            <div style={{background:`linear-gradient(135deg,${accent}22,${accent}08)`,padding:"12px 16px",borderBottom:`1px solid ${BDR}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                              <div style={{fontFamily:"'Bebas Neue'",fontSize:26,color:accent,letterSpacing:2}}>{fieldCfg.label} {f}</div>
+                          <div key={f} className="card-hover" style={{
+                            background:fd.live?`linear-gradient(135deg,rgba(12,20,38,0.9),rgba(8,14,26,0.95))`:"rgba(8,14,26,0.8)",
+                            backdropFilter:"blur(20px)",
+                            border:`2px solid ${fd.heldList.length>0?"rgba(245,158,11,0.4)":fd.live?`${accent}50`:"rgba(255,255,255,0.07)"}`,
+                            borderRadius:14,overflow:"hidden",
+                            boxShadow:fd.live?`0 8px 32px rgba(0,0,0,0.4), 0 0 24px ${accent}15`:"0 4px 16px rgba(0,0,0,0.3)",
+                            transition:"all .3s"}}>
+                            {/* Accent top bar */}
+                            <div style={{height:3,background:fd.live?`linear-gradient(90deg,${accent},${accent}aa,transparent)`:"linear-gradient(90deg,rgba(255,255,255,0.1),transparent)"}}/>
+                            <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                                <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(22px,3vw,30px)",color:accent,letterSpacing:2,textShadow:fd.live?`0 0 15px ${accent}60`:"none",lineHeight:1}}>{fieldCfg.label} {f}</div>
+                              </div>
                               <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                                {liveConflict&&<div style={{fontSize:10,fontWeight:700,color:"#f59e0b",background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.4)",borderRadius:20,padding:"3px 10px"}}>⚠ CONFLICT</div>}
+                                {liveConflict&&<div style={{fontSize:"clamp(8px,0.9vw,10px)",fontWeight:700,color:"#f59e0b",background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.35)",borderRadius:20,padding:"3px 10px",letterSpacing:0.5}}>⚠ CONFLICT</div>}
                                 {fd.live?(
-                                  <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.4)",borderRadius:20,padding:"4px 10px"}}>
-                                    <div className="blink" style={{width:6,height:6,borderRadius:"50%",background:"#ef4444"}}/>
-                                    <span style={{fontSize:10,fontWeight:700,color:"#ef4444",letterSpacing:1}}>LIVE</span>
+                                  <div className="badge-live livepulse">
+                                    <div className="blink" style={{width:5,height:5,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444"}}/>
+                                    LIVE
                                   </div>
-                                ):(<div style={{fontSize:11,fontWeight:700,color:"#475569"}}>{fd.heldList.length>0?"⏸ HELD":"STANDBY"}</div>)}
+                                ):(<div style={{fontSize:"clamp(9px,1vw,11px)",fontWeight:600,color:"#4a5f7a",letterSpacing:1}}>{fd.heldList.length>0?"⏸ HELD":"STANDBY"}</div>)}
                               </div>
                             </div>
                             <div style={{padding:"14px 16px",borderBottom:`1px solid ${BDR}`}}>
@@ -822,7 +1033,7 @@ export default function WRGDashboard() {
                     </div>
 
                     {/* COMING UP */}
-                    <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,overflow:"hidden"}}>
+                    <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,overflow:"hidden"}}>
                       <div style={{padding:"12px 18px",borderBottom:`1px solid ${BDR}`,display:"flex",alignItems:"center",gap:10,background:`linear-gradient(90deg,${accent}12,transparent)`}}>
                         <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:accent,letterSpacing:2}}>COMING UP</div>
                         <div style={{fontSize:11,color:"#475569"}}>— Next 6 in queue</div>
@@ -848,7 +1059,7 @@ export default function WRGDashboard() {
                 {pubTab==="fixtures"&&Object.keys(catTournament.groups||{}).map(g=>{
                   const gm=catMatches.filter(m=>m.group===g);
                   return(
-                    <div key={g} style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:10,marginBottom:14,overflow:"hidden"}}>
+                    <div key={g} style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,marginBottom:14,overflow:"hidden"}}>
                       <div style={{background:`linear-gradient(90deg,${accent}18,transparent)`,padding:"10px 16px",borderBottom:`1px solid ${BDR}`,display:"flex",alignItems:"center",gap:10}}>
                         <div style={{width:28,height:28,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:16,color:"#0f1525"}}>{g}</div>
                         <span style={{fontWeight:700,fontSize:14}}>GROUP {g}</span>
@@ -881,7 +1092,7 @@ export default function WRGDashboard() {
                 {pubTab==="standings"&&Object.keys(catTournament.groups||{}).map(g=>{
                   const rows=standings[g]||[];
                   return(
-                    <div key={g} style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:10,marginBottom:14,overflow:"hidden"}}>
+                    <div key={g} style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,marginBottom:14,overflow:"hidden"}}>
                       <div style={{background:`linear-gradient(90deg,${accent}18,transparent)`,padding:"10px 16px",borderBottom:`1px solid ${BDR}`,display:"flex",alignItems:"center",gap:10}}>
                         <div style={{width:28,height:28,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:16,color:"#0f1525"}}>{g}</div>
                         <span style={{fontWeight:700,fontSize:14}}>GROUP {g} STANDINGS</span>
@@ -918,12 +1129,12 @@ export default function WRGDashboard() {
             <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:3,color:pinModal.target==="judge"?"#00d4ff":"#ffd700",marginBottom:6}}>{pinModal.target==="judge"?"JUDGE PANEL":"ADMIN PANEL"}</div>
             <div style={{fontSize:12,color:"#475569",marginBottom:24}}>Enter access password</div>
             <input type="password" value={pinModal.input} onChange={e=>setPinModal(p=>({...p,input:e.target.value,error:false}))} onKeyDown={e=>e.key==="Enter"&&submitPin()} placeholder="Password" autoFocus
-              style={{width:"100%",background:BG,border:`2px solid ${pinModal.error?"#ef4444":pinModal.input?"#00d4ff":BDR}`,borderRadius:10,padding:"12px 18px",textAlign:"center",fontFamily:"'Rajdhani',sans-serif",fontSize:18,fontWeight:700,color:"#e2e8f0",marginBottom:8}}/>
+              style={{width:"100%",background:BG,border:`2px solid ${pinModal.error?"#ef4444":pinModal.input?"#00d4ff":BDR}`,borderRadius:10,padding:"12px 18px",textAlign:"center",fontFamily:"'Outfit',sans-serif",fontSize:18,fontWeight:700,color:"#e2e8f0",marginBottom:8}}/>
             {pinModal.error&&<div style={{fontSize:12,color:"#ef4444",marginBottom:12,fontWeight:700}}>✕ Incorrect password</div>}
             {!pinModal.error&&<div style={{marginBottom:12}}/>}
             <div style={{display:"flex",gap:10}}>
-              <button className="hbtn" style={{flex:1,padding:12,background:"transparent",border:`1px solid ${BDR}`,borderRadius:8,color:"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"}} onClick={()=>setPinModal(p=>({...p,open:false,input:"",error:false}))}>CANCEL</button>
-              <button className="hbtn" style={{flex:2,padding:12,background:pinModal.target==="judge"?"#00d4ff":"#ffd700",border:"none",borderRadius:8,color:"#0f1525",fontWeight:700,fontSize:13,cursor:"pointer"}} onClick={submitPin}>UNLOCK →</button>
+              <button className="hbtn" style={{flex:1,padding:12,background:"transparent",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,color:"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"}} onClick={()=>setPinModal(p=>({...p,open:false,input:"",error:false}))}>CANCEL</button>
+              <button className="hbtn" style={{flex:2,padding:12,background:pinModal.target==="judge"?"#00d4ff":"#ffd700",border:"none",borderRadius:8,color:"#0f1525",fontWeight:700,fontSize:13,cursor:"pointer"}} onMouseDown={submitPin}>UNLOCK →</button>
             </div>
           </div>
         </div>
@@ -931,23 +1142,35 @@ export default function WRGDashboard() {
 
       {/* SCORE MODAL */}
       {scoreModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:20}}
           onClick={e=>e.target===e.currentTarget&&setScoreModal(null)}>
-          <div className="fadein" style={{background:SURF,border:`1px solid ${accent}40`,borderRadius:16,padding:32,width:"100%",maxWidth:420}}>
-            <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:3,color:accent,textAlign:"center",marginBottom:8}}>ENTER MATCH RESULT</div>
-            <div style={{fontSize:11,color:"#475569",textAlign:"center",marginBottom:24}}>{scoreModal.p1name} vs {scoreModal.p2name}</div>
-            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:24}}>
-              {[{key:"s1",name:scoreModal.p1name},{key:"s2",name:scoreModal.p2name}].map(({key,name})=>(
+          <div className="scalein" style={{background:"rgba(8,14,26,0.95)",backdropFilter:"blur(30px)",border:`1px solid ${accent}35`,borderRadius:20,padding:"28px 24px",width:"100%",maxWidth:440,boxShadow:`0 24px 80px rgba(0,0,0,0.7), 0 0 40px ${accent}15`}}>
+            {/* Header */}
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4,color:accent,textShadow:`0 0 20px ${accent}60`}}>MATCH RESULT</div>
+              <div style={{fontSize:"clamp(10px,1.1vw,12px)",color:"#4a5f7a",marginTop:4,letterSpacing:0.5}}>{scoreModal.p1name} vs {scoreModal.p2name}</div>
+            </div>
+            {/* Score inputs */}
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+              {[{key:"s1",name:scoreModal.p1name},{key:"s2",name:scoreModal.p2name}].map(({key,name},i)=>(
                 <div key={key} style={{flex:1,textAlign:"center"}}>
-                  <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"#e2e8f0"}}>{name}</div>
-                  <input type="number" min="0" max="99" value={scoreInput[key]} onChange={e=>setScoreInput(s=>({...s,[key]:e.target.value}))} placeholder="0"
-                    style={{width:"100%",background:BG,border:`2px solid ${scoreInput[key]!==""?accent:BDR}`,borderRadius:10,padding:"14px 0",textAlign:"center",fontFamily:"'Bebas Neue'",fontSize:52,color:accent,outline:"none"}}/>
+                  <div style={{fontWeight:600,fontSize:"clamp(11px,1.2vw,13px)",marginBottom:10,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</div>
+                  <div style={{position:"relative"}}>
+                    <input type="number" min="0" max="99" value={scoreInput[key]}
+                      onChange={e=>setScoreInput(s=>({...s,[key]:e.target.value}))}
+                      placeholder="0"
+                      className="score-input"
+                      style={{width:"100%",border:`2px solid ${scoreInput[key]!==""?accent:"rgba(255,255,255,0.1)"}`,padding:"16px 0",fontFamily:"'Bebas Neue'",fontSize:"clamp(44px,6vw,68px)",color:accent,boxShadow:scoreInput[key]!==""?`0 0 20px ${accent}30`:"none"}}/>
+                  </div>
                 </div>
               ))}
             </div>
+            {/* Buttons */}
             <div style={{display:"flex",gap:10}}>
-              <button className="hbtn" onClick={()=>setScoreModal(null)} style={{flex:1,padding:13,background:"transparent",border:`1px solid ${BDR}`,borderRadius:8,color:"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"}}>CANCEL</button>
-              <button className="hbtn" onClick={submitScore} style={{flex:2,padding:13,background:accent,border:"none",borderRadius:8,color:"#0f1525",fontWeight:700,fontSize:13,cursor:"pointer"}}>✓ CONFIRM SCORE</button>
+              <button className="hbtn" onClick={()=>setScoreModal(null)}
+                style={{flex:1,padding:"13px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,color:"#4a5f7a",fontWeight:700,fontSize:"clamp(11px,1.2vw,13px)",cursor:"pointer",letterSpacing:0.5}}>CANCEL</button>
+              <button className="hbtn" onMouseDown={submitScore}
+                style={{flex:2,padding:"13px",background:`linear-gradient(135deg,${accent},${accent}cc)`,border:"none",borderRadius:10,color:"#030912",fontWeight:700,fontSize:"clamp(11px,1.2vw,13px)",cursor:"pointer",letterSpacing:1,boxShadow:`0 4px 20px ${accent}40`}}>✓ CONFIRM SCORE</button>
             </div>
           </div>
         </div>
@@ -1029,7 +1252,7 @@ function CsvImport({CATEGORIES, onImport, onReplace, BG, SURF, BDR}){
   }
 
   if(!open) return(
-    <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:12,padding:14,marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+    <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:14,marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div>
         <div style={{fontSize:12,fontWeight:700,color:"#e2e8f0"}}>📥 BULK IMPORT VIA CSV</div>
         <div style={{fontSize:11,color:"#475569",marginTop:2}}>Paste your full participant list from Excel in one go</div>
@@ -1044,7 +1267,7 @@ function CsvImport({CATEGORIES, onImport, onReplace, BG, SURF, BDR}){
     <div style={{background:SURF,border:`2px solid rgba(0,212,255,.3)`,borderRadius:12,padding:18,marginBottom:14}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
         <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:"#00d4ff",letterSpacing:2}}>📥 BULK CSV IMPORT</div>
-        <button style={{padding:"5px 12px",background:"transparent",border:`1px solid ${BDR}`,borderRadius:6,color:"#475569",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{setOpen(false);setCsvText("");setPreview([]);setError("");}}>✕ CLOSE</button>
+        <button style={{padding:"5px 12px",background:"transparent",border:"1px solid rgba(255,255,255,0.07)",borderRadius:6,color:"#475569",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{setOpen(false);setCsvText("");setPreview([]);setError("");}}>✕ CLOSE</button>
       </div>
 
       {/* FORMAT GUIDE */}
@@ -1104,7 +1327,7 @@ function CsvImport({CATEGORIES, onImport, onReplace, BG, SURF, BDR}){
             {preview.length>8&&<div style={{padding:"6px 12px",fontSize:11,color:"#475569"}}>...and {preview.length-8} more</div>}
           </div>
           <button
-            style={{width:"100%",marginTop:12,padding:"12px",background:"linear-gradient(135deg,#00d4ff,#0099cc)",border:"none",borderRadius:8,color:"#0f1525",fontFamily:"'Rajdhani',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",letterSpacing:1}}
+            style={{width:"100%",marginTop:12,padding:"12px",background:"linear-gradient(135deg,#00d4ff,#0099cc)",border:"none",borderRadius:8,color:"#0f1525",fontFamily:"'Outfit',sans-serif",fontWeight:700,fontSize:14,cursor:"pointer",letterSpacing:1}}
             onClick={handleImport}>
             {mode==="replace"?`🔄 REPLACE WITH ${preview.length} PARTICIPANTS`:`➕ ADD ${preview.length} PARTICIPANTS`}
           </button>
@@ -1184,7 +1407,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
     <div className="fadein">
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
         <button
-          style={{padding:"7px 14px",borderRadius:7,fontSize:11,fontWeight:700,color:"#64748b",background:"transparent",border:`1px solid ${BDR}`,cursor:"pointer"}}
+          style={{padding:"7px 14px",borderRadius:7,fontSize:11,fontWeight:700,color:"#64748b",background:"transparent",border:"1px solid rgba(255,255,255,0.07)",cursor:"pointer"}}
           onClick={changeJudgeCategory}>← BACK</button>
         <div>
           <div style={{fontFamily:"'Bebas Neue'",fontSize:20,color:selColor,letterSpacing:2}}>{selCat.icon} {selCat.name}</div>
@@ -1244,8 +1467,8 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{fieldPending.length} pending · {fieldHeld.length} held · {fieldDone.length} done</div>
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
-          <button style={{padding:"6px 12px",borderRadius:6,fontSize:10,fontWeight:700,color:"#64748b",background:"transparent",border:`1px solid ${BDR}`,cursor:"pointer"}} onClick={()=>setJudgeField(null)}>← {selFc.label}</button>
-          <button style={{padding:"6px 12px",borderRadius:6,fontSize:10,fontWeight:700,color:"#64748b",background:"transparent",border:`1px solid ${BDR}`,cursor:"pointer"}} onClick={changeJudgeCategory}>← CATEGORY</button>
+          <button style={{padding:"6px 12px",borderRadius:6,fontSize:10,fontWeight:700,color:"#64748b",background:"transparent",border:"1px solid rgba(255,255,255,0.07)",cursor:"pointer"}} onClick={()=>setJudgeField(null)}>← {selFc.label}</button>
+          <button style={{padding:"6px 12px",borderRadius:6,fontSize:10,fontWeight:700,color:"#64748b",background:"transparent",border:"1px solid rgba(255,255,255,0.07)",cursor:"pointer"}} onClick={changeJudgeCategory}>← CATEGORY</button>
         </div>
       </div>
 
@@ -1325,7 +1548,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
         <div style={{marginTop:8}}>
           <div style={{fontSize:10,color:"#475569",fontWeight:700,letterSpacing:2,marginBottom:8}}>RECENTLY COMPLETED</div>
           {fieldDone.slice(-4).reverse().map(m=>(
-            <div key={m.id} style={{background:SURF,border:`1px solid ${BDR}18`,borderRadius:8,padding:"9px 16px",marginBottom:6,display:"flex",alignItems:"center",gap:12,opacity:0.6}}>
+            <div key={m.id} style={{background:"rgba(10,18,34,0.5)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:8,padding:"9px 16px",marginBottom:6,display:"flex",alignItems:"center",gap:12,opacity:0.6}}>
               <div style={{flex:1,fontSize:13,fontWeight:600}}>{m.p1name}</div>
               <div style={{fontFamily:"'Bebas Neue'",fontSize:20,letterSpacing:4}}>{m.score1} – {m.score2}</div>
               <div style={{flex:1,textAlign:"right",fontSize:13,fontWeight:600}}>{m.p2name}</div>
@@ -1340,7 +1563,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
 
 function BracketView({accent,BDR,SURF,BG}){
   return(
-    <div style={{background:SURF,border:`1px solid ${BDR}`,borderRadius:10,padding:20,overflowX:"auto"}}>
+    <div style={{background:"rgba(10,18,34,0.7)",backdropFilter:"blur(16px)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:10,padding:20,overflowX:"auto"}}>
       <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:"#475569",letterSpacing:2,marginBottom:20}}>KNOCKOUT BRACKET — GENERATED AFTER GROUP STAGE</div>
       <div style={{display:"flex",gap:16,alignItems:"center",minWidth:600}}>
         {[["R16",8,"sm"],["QF",4,"md"],["SF",2,"lg"]].map(([label,count,size])=>(
@@ -1348,7 +1571,7 @@ function BracketView({accent,BDR,SURF,BG}){
             <div style={{fontSize:9,color:"#475569",letterSpacing:2,fontWeight:700,marginBottom:6}}>{label==="R16"?"ROUND OF 16":label==="QF"?"QUARTER FINALS":"SEMI FINALS"}</div>
             <div style={{display:"flex",flexDirection:"column",gap:size==="sm"?6:size==="md"?14:28}}>
               {Array.from({length:count}).map((_,i)=>(
-                <div key={i} style={{background:BG,border:`1px solid ${BDR}`,borderRadius:6,padding:"6px 10px",width:100}}>
+                <div key={i} style={{background:BG,border:"1px solid rgba(255,255,255,0.07)",borderRadius:6,padding:"6px 10px",width:100}}>
                   <div style={{borderBottom:`1px solid ${BDR}22`,paddingBottom:3,marginBottom:3,color:"#475569",fontSize:11}}>TBD</div>
                   <div style={{color:"#3a4a65",fontSize:11}}>TBD</div>
                 </div>
