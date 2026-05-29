@@ -1084,7 +1084,7 @@ export default function WRGDashboard(){
                   })}
 
                   {/* ── PLAYER SEARCH BAR ── */}
-                  <div style={{marginBottom:18}}>
+                  {pubTab!=="teams"&&<div style={{marginBottom:18}}>}
                     <div style={{position:"relative"}}>
                       <input
                         value={playerSearch}
