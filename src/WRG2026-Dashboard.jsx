@@ -1620,7 +1620,7 @@ export default function WRGDashboard(){
                           return(
                             <div key={c.id} style={{background:S1,border:`1px solid ${c.color}20`,borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
                               <div style={{fontSize:11,fontWeight:700,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.icon} {c.name}</div>
-                              <div style={{display:"flex",gap:6,marginBottom:allDone?8:0}}>
+                              <div style={{display:"flex",gap:6,marginBottom:total>0?8:0}}>
                                 {[["GRP",grps],["DONE",`${done}/${total}`],["HOLD",hld]].map(([l,v])=>(
                                   <div key={l} style={{flex:1,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"5px 6px",textAlign:"center"}}>
                                     <div style={{fontSize:8,color:l==="HOLD"&&hld>0?"#f59e0b":"rgba(0,230,100,0.3)",fontWeight:700}}>{l}</div>
@@ -1628,13 +1628,15 @@ export default function WRGDashboard(){
                                   </div>
                                 ))}
                               </div>
-                              {allDone&&(
+                              {total>0&&(
                                 koGenerated?(
                                   <div style={{fontSize:9,color:"#ffd700",fontWeight:700,background:"rgba(255,215,0,0.08)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:5,padding:"4px 8px",textAlign:"center"}}>🏆 KNOCKOUT READY</div>
                                 ):(
                                   <button className="hbtn" onClick={()=>triggerGenerateKnockout(c.id)}
-                                    style={{width:"100%",padding:"6px",background:`${c.color}15`,border:`1px solid ${c.color}40`,borderRadius:5,color:c.color,fontWeight:700,fontSize:10,cursor:"pointer"}}>
-                                    ⚡ GENERATE KNOCKOUT
+                                    style={{width:"100%",padding:"6px",background:allDone?`${c.color}20`:"rgba(0,230,100,0.05)",
+                                      border:`1px solid ${allDone?c.color+"50":"rgba(0,230,100,0.15)"}`,
+                                      borderRadius:5,color:allDone?c.color:"rgba(0,230,100,0.35)",fontWeight:700,fontSize:10,cursor:"pointer"}}>
+                                    {allDone?"⚡ GENERATE KNOCKOUT":"⚡ GENERATE KNOCKOUT (Group stage incomplete)"}
                                   </button>
                                 )
                               )}
