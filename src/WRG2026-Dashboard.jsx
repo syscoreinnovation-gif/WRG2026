@@ -1,4 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { db } from "./firebase.js";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
+
+// Firestore document reference
+const STATE_REF = doc(db, "wrg2026", "state");
 
 const PINS = { judge: "S0502", admin: "S0502" };
 
@@ -30,28 +35,7 @@ const CATEGORIES = [
   { id:"ssr",    name:"Sumo Senior RC",         short:"Senior RC",     icon:"🤖", color:"#e879f9" },
 ];
 
-const DEMO_PARTICIPANTS = [
-  { id:"s001", name:"Ahmad Danial",    categories:["diy-p","sjr"]   },
-  { id:"s002", name:"Nurul Ain",       categories:["diy-p","diy-s"] },
-  { id:"s003", name:"Muhammad Haziq", categories:["diy-p","sia"]   },
-  { id:"s004", name:"Siti Nabilah",   categories:["diy-s","sja"]   },
-  { id:"s005", name:"Arjun Kumar",    categories:["open2","drone"]  },
-  { id:"s006", name:"Tan Wei Ming",   categories:["diy-p","open2"]  },
-  { id:"s007", name:"Fatimah Zahra",  categories:["diy-p"]          },
-  { id:"s008", name:"Kevin Raj",      categories:["soc4","ssa"]     },
-  { id:"s009", name:"Ain Nadhirah",   categories:["diy-s"]          },
-  { id:"s010", name:"Harith Aiman",   categories:["diy-p","sir"]    },
-  { id:"s011", name:"Priya Menon",    categories:["open2","sjr"]    },
-  { id:"s012", name:"Zulaikha Haris", categories:["diy-p","sja"]   },
-  { id:"s013", name:"Bryan Lee",      categories:["drone","ssr"]    },
-  { id:"s014", name:"Irdina Sofea",   categories:["diy-s","diy-p"] },
-  { id:"s015", name:"Daniel Hakim",   categories:["soc4","sia"]     },
-  { id:"s016", name:"Yasmin Noor",    categories:["diy-p"]          },
-  { id:"s017", name:"Rizwan Asri",    categories:["open2","ssa"]    },
-  { id:"s018", name:"Cheryl Ong",     categories:["diy-s","sjr"]   },
-  { id:"s019", name:"Luqman Hakim",   categories:["diy-p","sir"]    },
-  { id:"s020", name:"Mei Xin",        categories:["diy-s","drone"]  },
-];
+// Participants loaded from Firebase — no hardcoded demo data
 
 function calcGroupSizes(n){
   if(n<=0)return[];
@@ -107,7 +91,7 @@ function defaultGroupFieldMaps(){
 
 // ═══════════════════════════════════════════════════════════
 export default function WRGDashboard(){
-  const [view,setView]             = useState("admin");
+  const [view,setView]             = useState("public");
   const [adminTab,setAdminTab]     = useState("participants");
   const [activeCat,setActiveCat]   = useState("diy-p");
   const [pubTab,setPubTab]         = useState("fields");
@@ -115,7 +99,7 @@ export default function WRGDashboard(){
   const [auth,setAuth]             = useState({judge:false,admin:false});
   const [pinModal,setPinModal]     = useState({open:false,target:null,input:"",error:false,shake:false});
   const [flash,setFlash]           = useState(null);
-  const [participants,setParticipants] = useState(DEMO_PARTICIPANTS.map(p=>({...p,attendance:null})));
+  const [participants,setParticipants] = useState([]);
   const [addForm,setAddForm]       = useState({name:"",cats:[]});
   const [searchQ,setSearchQ]       = useState("");
   const [attFilter,setAttFilter]   = useState("all");
@@ -126,6 +110,46 @@ export default function WRGDashboard(){
   const [judgeCategory,setJudgeCategory] = useState(null);
   const [judgeField,setJudgeField] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  const [syncing,setSyncing]       = useState(true);
+
+  // ── Save to Firebase ─────────────────────────────────────
+  const saveState = async (stateData) => {
+    try {
+      console.log("Saving to Firebase...", stateData.participants?.length, "participants");
+      await setDoc(STATE_REF, {
+        participants: stateData.participants || [],
+        groupFieldMaps: stateData.groupFieldMaps || {},
+        tournamentData: stateData.tournamentData || null,
+        updatedAt: Date.now()
+      });
+      console.log("Firebase save successful");
+    } catch(e) {
+      console.error("Firebase save error:", e);
+      showFlash("⚠ Save failed — check connection");
+    }
+  };
+
+  // ── Firebase real-time sync ──────────────────────────────
+  useEffect(()=>{
+    const unsub = onSnapshot(STATE_REF, (snap)=>{
+      if(snap.exists()){
+        const d = snap.data();
+        if(d.participants) setParticipants(d.participants);
+        if(d.groupFieldMaps) setGroupFieldMaps(d.groupFieldMaps);
+        setData(d.tournamentData || null);
+      } else {
+        // First time — initialise with empty state
+        setParticipants([]);
+        setGroupFieldMaps(defaultGroupFieldMaps());
+        setData(null);
+      }
+      setSyncing(false);
+    }, (err)=>{
+      console.error("Sync error:", err);
+      setSyncing(false);
+    });
+    return ()=>unsub();
+  },[]);
 
   const isGenerated=!!data;
   const cat=CATEGORIES.find(c=>c.id===activeCat);
@@ -179,29 +203,68 @@ export default function WRGDashboard(){
   function lockView(){setAuth(a=>({...a,[view]:false}));setJudgeField(null);setJudgeCategory(null);setView("public");}
   function addParticipant(){
     if(!addForm.name.trim()||!addForm.cats.length)return;
-    setParticipants(prev=>[...prev,{id:`p${Date.now()}`,name:addForm.name.trim(),categories:addForm.cats,attendance:null}]);
+    const newP={id:`p${Date.now()}`,name:addForm.name.trim(),categories:addForm.cats,attendance:null};
+    const updated=[...participants,newP];
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data});
     setAddForm({name:"",cats:[]});showFlash(`✓ ${addForm.name.trim()} added`);
   }
-  function removeParticipant(id){setParticipants(prev=>prev.filter(p=>p.id!==id));showFlash("Participant removed");}
+  function removeParticipant(id){
+    const updated=participants.filter(p=>p.id!==id);
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data});
+    showFlash("Participant removed");
+  }
   function toggleAddCat(cid){setAddForm(f=>({...f,cats:f.cats.includes(cid)?f.cats.filter(c=>c!==cid):[...f.cats,cid]}));}
-  function markAttendance(id,status){setParticipants(prev=>prev.map(p=>p.id===id?{...p,attendance:status}:p));}
-  function markAllPresent(){setParticipants(prev=>prev.map(p=>({...p,attendance:"present"})));showFlash("✓ All marked PRESENT");}
-  function markAllAbsent(){setParticipants(prev=>prev.map(p=>({...p,attendance:"absent"})));}
+  function markAttendance(id,status){
+    const updated=participants.map(p=>p.id===id?{...p,attendance:status}:p);
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data});
+  }
+  function markAllPresent(){
+    const updated=participants.map(p=>({...p,attendance:"present"}));
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data});
+    showFlash("✓ All marked PRESENT");
+  }
+  function markAllAbsent(){
+    const updated=participants.map(p=>({...p,attendance:"absent"}));
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data});
+  }
   function generateTournamentHandler(){
     if(presentCount===0){showFlash("⚠ No participants marked present");return;}
-    setData(generateTournament(participants,groupFieldMaps));
+    const tournament=generateTournament(participants,groupFieldMaps);
+    setData(tournament);
+    saveState({participants,groupFieldMaps,tournamentData:tournament});
     setAdminTab("overview");showFlash("🏆 Tournament is LIVE!");
   }
-  function resetTournament(){setData(null);setParticipants(prev=>prev.map(p=>({...p,attendance:null})));setGroupFieldMaps(defaultGroupFieldMaps());setJudgeCategory(null);setJudgeField(null);setAdminTab("participants");showFlash("Tournament reset");}
-  function assignGroup(catId,group,fieldNum){setGroupFieldMaps(prev=>({...prev,[catId]:{...(prev[catId]||{}),[group]:fieldNum}}));}
+  function resetTournament(){
+    const resetParts=participants.map(p=>({...p,attendance:null}));
+    const resetMaps=defaultGroupFieldMaps();
+    setData(null);
+    setParticipants(resetParts);
+    setGroupFieldMaps(resetMaps);
+    setJudgeCategory(null);setJudgeField(null);setAdminTab("participants");
+    saveState({participants:resetParts,groupFieldMaps:resetMaps,tournamentData:null});
+    showFlash("Tournament reset");
+  }
+  function assignGroup(catId,group,fieldNum){
+    const updated={...groupFieldMaps,[catId]:{...(groupFieldMaps[catId]||{}),[group]:fieldNum}};
+    setGroupFieldMaps(updated);
+    saveState({participants,groupFieldMaps:updated,tournamentData:data});
+  }
   function getGroupFieldMap(catId,groups,fieldCount){
     const existing=groupFieldMaps[catId]||{};const result={};
     groups.forEach((g,i)=>{result[g]=existing[g]||(i%fieldCount)+1;});return result;
   }
   function updateMatch(matchId,updates){
-    setData(prev=>{const next={...prev};
+    setData(prev=>{
+      const next={...prev};
       Object.keys(next).forEach(cid=>{next[cid]={...next[cid],matches:next[cid].matches.map(m=>m.id===matchId?{...m,...updates}:m)};});
-      return next;});
+      saveState({participants,groupFieldMaps,tournamentData:next});
+      return next;
+    });
   }
   function holdMatch(id){updateMatch(id,{status:"held"});showFlash("⏸ Match on hold");}
   function releaseMatch(id){updateMatch(id,{status:"pending"});showFlash("▶ Match released");}
@@ -222,6 +285,17 @@ export default function WRGDashboard(){
   const S2="rgba(12,28,16,0.9)";
   const BD="rgba(0,230,100,0.08)";
   const BDH="rgba(0,230,100,0.2)";
+
+  if(syncing) return(
+    <div style={{background:"#050e08",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow',sans-serif"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color:"#00e664",letterSpacing:6,opacity:0.3,marginBottom:16}}>WRG 2026</div>
+        <div style={{width:40,height:40,border:"3px solid rgba(0,230,100,0.2)",borderTop:"3px solid #00e664",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/>
+        <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+        <div style={{fontSize:12,color:"rgba(0,230,100,0.4)",marginTop:14,letterSpacing:2}}>CONNECTING...</div>
+      </div>
+    </div>
+  );
 
   return(
     <div style={{fontFamily:"'Barlow',sans-serif",background:BG,minHeight:"100vh",color:"#e8f5ee",display:"flex",flexDirection:"column"}}>
@@ -654,8 +728,17 @@ export default function WRGDashboard(){
 
                   {/* CSV Import */}
                   <CsvImport CATEGORIES={CATEGORIES}
-                    onImport={(p)=>{setParticipants(prev=>[...prev,...p]);showFlash(`✓ ${p.length} imported`);}}
-                    onReplace={(p)=>{setParticipants(p);showFlash(`✓ ${p.length} loaded`);}}
+                    onImport={(p)=>{
+                      const updated=[...participants,...p];
+                      setParticipants(updated);
+                      saveState({participants:updated,groupFieldMaps,tournamentData:data});
+                      showFlash(`✓ ${p.length} imported`);
+                    }}
+                    onReplace={(p)=>{
+                      setParticipants(p);
+                      saveState({participants:p,groupFieldMaps,tournamentData:data});
+                      showFlash(`✓ ${p.length} loaded`);
+                    }}
                     G={G} S1={S1} BD={BD} BG={BG}/>
 
                   {/* Add form */}
