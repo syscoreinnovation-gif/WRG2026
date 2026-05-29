@@ -325,6 +325,12 @@ export default function WRGDashboard(){
     saveState({participants:resetParts,groupFieldMaps:resetMaps,tournamentData:null});
     showFlash("Tournament reset");
   }
+  function clearAllParticipants(){
+    setParticipants([]);
+    saveState({participants:[],groupFieldMaps:defaultGroupFieldMaps(),tournamentData:null});
+    setData(null);
+    showFlash("✓ All participants cleared");
+  }
   function assignGroup(catId,group,fieldNum){
     const updated={...groupFieldMaps,[catId]:{...(groupFieldMaps[catId]||{}),[group]:fieldNum}};
     setGroupFieldMaps(updated);
@@ -376,14 +382,16 @@ export default function WRGDashboard(){
   return(
     <div style={{fontFamily:"'Barlow',sans-serif",background:BG,minHeight:"100vh",color:"#e8f5ee",display:"flex",flexDirection:"column"}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        html,body,#root{background:#050e08;overscroll-behavior:none;}
+        html,body,#root{background:#050e08;overscroll-behavior:none;-webkit-text-size-adjust:100%;}
         body::before{content:'';position:fixed;inset:0;
           background:radial-gradient(ellipse at 0% 50%,rgba(0,230,100,0.04) 0%,transparent 50%),
             radial-gradient(ellipse at 100% 0%,rgba(0,212,255,0.03) 0%,transparent 50%);
           pointer-events:none;z-index:0;}
         #root{position:relative;z-index:1;}
+
+        /* ── BASE ── */
         .hbtn{cursor:pointer;border:none;font-family:'Barlow',sans-serif;transition:all .18s;position:relative;overflow:hidden;}
         .hbtn:hover{filter:brightness(1.1);}
         .hbtn:active{transform:scale(.97);}
@@ -393,47 +401,160 @@ export default function WRGDashboard(){
         @keyframes fi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         .scalein{animation:sc .28s cubic-bezier(.34,1.56,.64,1) both;}
         @keyframes sc{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
-        .shake{animation:sh .4s ease both;}
-        @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
         .blink{animation:bk 1.8s ease-in-out infinite;}
         @keyframes bk{0%,100%{opacity:1}50%{opacity:.15}}
         .pulse{animation:pu 2s ease-in-out infinite;}
         @keyframes pu{0%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
-        .green-pulse{animation:gp 2s ease-in-out infinite;}
-        @keyframes gp{0%{box-shadow:0 0 0 0 rgba(0,230,100,.4)}70%{box-shadow:0 0 0 8px rgba(0,230,100,0)}100%{box-shadow:0 0 0 0 rgba(0,230,100,0)}}
-        .sidebar{transition:transform .25s cubic-bezier(.4,0,.2,1);}
+        .shake{animation:sh .4s ease both;}
+        @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
         input:focus,textarea:focus{outline:none;}
         input::-webkit-inner-spin-button{-webkit-appearance:none;}
-        ::-webkit-scrollbar{width:4px;height:4px;}
+        ::-webkit-scrollbar{width:3px;height:3px;}
         ::-webkit-scrollbar-track{background:transparent;}
         ::-webkit-scrollbar-thumb{background:rgba(0,230,100,0.2);border-radius:4px;}
-        @media(max-width:768px){
-          .sidebar-desktop{display:none!important;}
-          .mobile-cats{display:flex!important;}
-          .main-content{margin-left:0!important;}
-          .field-grid{grid-template-columns:1fr!important;}
-          .match-card-inner{flex-wrap:wrap!important;}
-          .match-actions{width:100%!important;margin-top:8px!important;}
-          .stat-row{grid-template-columns:repeat(2,1fr)!important;}
-          .judge-field-grid{grid-template-columns:repeat(2,1fr)!important;}
-          .judge-cat-grid{grid-template-columns:1fr!important;}
-          .header-subtitle{display:none!important;}
+
+        /* ── PLAYER NAME — handles 40-45 char Malaysian names ── */
+        .player-name{
+          font-weight:700;
+          font-family:'Barlow',sans-serif;
+          line-height:1.25;
+          word-break:break-word;
+          hyphens:auto;
         }
-        @media(min-width:769px){
-          .mobile-cats{display:none!important;}
-          .sidebar-desktop{display:flex!important;}
-          .field-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;}
-          .stat-row{grid-template-columns:repeat(4,1fr)!important;}
+        .player-name-lg{font-size:clamp(13px,1.6vw,16px);}
+        .player-name-md{font-size:clamp(11px,1.3vw,14px);}
+        .player-name-sm{font-size:clamp(10px,1.1vw,12px);}
+        .name-clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+        .name-clamp1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+        /* ── LAYOUT CONTAINERS ── */
+        .app-body{display:flex;flex:1;position:relative;}
+        .sidebar-wrap{
+          width:210px;background:rgba(5,12,8,0.98);
+          backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+          border-right:1px solid rgba(0,230,100,0.08);
+          position:fixed;top:54px;bottom:0;left:0;z-index:100;
+          display:flex;flex-direction:column;overflow-y:auto;
+          transition:transform .25s cubic-bezier(.4,0,.2,1);
+        }
+        .main-wrap{
+          flex:1;
+          transition:margin .25s;
+          min-height:calc(100vh - 54px);
+        }
+        .main-inner{margin:0 auto;padding:20px 24px;}
+
+        /* ── FIELD GRID ── */
+        .field-grid{display:grid;gap:12px;}
+
+        /* ── MATCH CARD LAYOUT ── */
+        .match-vs-row{display:flex;align-items:center;gap:8px;width:100%;}
+        .match-vs-row .player-side{flex:1;min-width:0;}
+        .match-vs-row .player-side.right{text-align:right;}
+        .vs-badge{
+          flex-shrink:0;
+          background:rgba(0,230,100,0.1);
+          border:1px solid rgba(0,230,100,0.2);
+          border-radius:6px;padding:5px 8px;
+          font-family:'Bebas Neue';font-size:14px;
+          color:rgba(0,230,100,0.6);letter-spacing:2px;
+          min-width:36px;text-align:center;
+        }
+
+        /* ── HORIZONTAL CAT SCROLL (mobile) ── */
+        .cat-scroll{
+          overflow-x:auto;background:rgba(5,12,8,0.95);
+          border-bottom:1px solid rgba(0,230,100,0.08);
+          padding:0 12px;position:sticky;top:54px;z-index:99;
+          -webkit-overflow-scrolling:touch;
+          scrollbar-width:none;
+        }
+        .cat-scroll::-webkit-scrollbar{display:none;}
+        .cat-scroll-inner{display:flex;min-width:max-content;}
+
+        /* ── STAT GRID ── */
+        .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+
+        /* ══════════════════════════════════════
+           BREAKPOINTS
+        ══════════════════════════════════════ */
+
+        /* ── PHONE PORTRAIT (< 640px) ── */
+        @media(max-width:639px){
+          .sidebar-wrap{display:none!important;}
+          .cat-scroll{display:block!important;}
+          .main-wrap{margin-left:0!important;}
+          .main-inner{padding:12px 12px;}
+          .field-grid{grid-template-columns:1fr!important;}
+          .match-vs-row{flex-direction:column;gap:6px;align-items:stretch;}
+          .match-vs-row .player-side{text-align:center!important;}
+          .vs-badge{align-self:center;width:60px;}
+          .player-name-lg{font-size:14px!important;}
+          .player-name-md{font-size:12px!important;}
+          .stat-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:1fr!important;}
+          .judge-field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .admin-grid{grid-template-columns:1fr!important;}
+          .hide-mobile{display:none!important;}
+          .hero-bar{flex-direction:column!important;gap:10px!important;}
+          .coming-up-row{flex-wrap:wrap;}
+          .pub-tabs{flex-wrap:wrap;}
+          .pub-tabs button{font-size:10px!important;padding:6px 10px!important;}
+          .search-results-grid{grid-template-columns:1fr!important;}
+        }
+
+        /* ── PHONE LANDSCAPE & SMALL TABLET (640px - 768px) ── */
+        @media(min-width:640px) and (max-width:767px){
+          .sidebar-wrap{display:none!important;}
+          .cat-scroll{display:block!important;}
+          .main-wrap{margin-left:0!important;}
+          .main-inner{padding:14px 16px;}
+          .field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .stat-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-field-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .admin-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .search-results-grid{grid-template-columns:1fr!important;}
+        }
+
+        /* ── TABLET PORTRAIT (768px - 1023px) ── */
+        @media(min-width:768px) and (max-width:1023px){
+          .sidebar-wrap{display:none!important;}
+          .cat-scroll{display:block!important;}
+          .main-wrap{margin-left:0!important;}
+          .main-inner{padding:16px 20px;}
+          .field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .stat-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .judge-cat-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .judge-field-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .admin-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .search-results-grid{grid-template-columns:repeat(2,1fr)!important;}
+        }
+
+        /* ── TABLET LANDSCAPE & LAPTOP (1024px - 1279px) ── */
+        @media(min-width:1024px) and (max-width:1279px){
+          .sidebar-wrap{display:flex!important;}
+          .cat-scroll{display:none!important;}
+          .main-inner{padding:20px 22px;}
+          .field-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .stat-grid{grid-template-columns:repeat(4,1fr)!important;}
           .judge-cat-grid{grid-template-columns:repeat(3,1fr)!important;}
           .judge-field-grid{grid-template-columns:repeat(4,1fr)!important;}
+          .admin-grid{grid-template-columns:repeat(2,1fr)!important;}
+          .search-results-grid{grid-template-columns:repeat(2,1fr)!important;}
         }
-        @media(min-width:1100px){
+
+        /* ── DESKTOP (1280px+) ── */
+        @media(min-width:1280px){
+          .sidebar-wrap{display:flex!important;}
+          .cat-scroll{display:none!important;}
+          .main-inner{padding:24px 28px;}
+          .field-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .stat-grid{grid-template-columns:repeat(4,1fr)!important;}
           .judge-cat-grid{grid-template-columns:repeat(4,1fr)!important;}
           .judge-field-grid{grid-template-columns:repeat(5,1fr)!important;}
-        }
-        @media(min-width:1100px){
-          .field-grid{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))!important;}
-          .stat-row{grid-template-columns:repeat(6,1fr)!important;}
+          .admin-grid{grid-template-columns:repeat(3,1fr)!important;}
+          .search-results-grid{grid-template-columns:repeat(3,1fr)!important;}
         }
       `}</style>
 
@@ -471,11 +592,11 @@ export default function WRGDashboard(){
         </div>
       </header>
 
-      <div style={{display:"flex",flex:1,position:"relative"}}>
+      <div className="app-body">
 
-        {/* ── SIDEBAR (desktop) ── */}
+        {/* ── SIDEBAR (desktop via CSS) ── */}
         {isGenerated&&(
-          <aside className="sidebar sidebar-desktop" style={{width:220,background:"rgba(5,12,8,0.98)",backdropFilter:"blur(20px)",borderRight:"1px solid rgba(0,230,100,0.08)",position:"fixed",top:54,bottom:0,left:0,zIndex:100,flexDirection:"column",overflowY:"auto"}}>
+          <aside className="sidebar-wrap">
             {/* Category list header */}
             <div style={{padding:"14px 16px 8px",fontSize:9,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:3,textTransform:"uppercase",borderBottom:"1px solid rgba(0,230,100,0.06)"}}>Categories</div>
             {CATEGORIES.map(c=>{
@@ -506,25 +627,28 @@ export default function WRGDashboard(){
           </aside>
         )}
 
-        {/* ── MOBILE CATEGORY SCROLL BAR ── */}
+        {/* ── MOBILE CATEGORY SCROLL ── */}
         {isGenerated&&(
-          <div className="mobile-cats" style={{display:"none",overflowX:"auto",background:"rgba(5,12,8,0.95)",borderBottom:"1px solid rgba(0,230,100,0.08)",padding:"0 12px",position:"sticky",top:54,zIndex:99}}>
-            {CATEGORIES.map(c=>{
-              const isActive=activeCat===c.id;
-              return(
-                <button key={c.id} className="hbtn"
-                  style={{padding:"9px 12px",background:"transparent",border:"none",
-                    borderBottom:isActive?`2px solid ${c.color}`:"2px solid transparent",
-                    color:isActive?c.color:"rgba(0,230,100,0.35)",fontSize:10,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer",letterSpacing:0.3}}
-                  onClick={()=>setActiveCat(c.id)}>{c.icon} {c.short}</button>
-              );
-            })}
+          <div className="cat-scroll">
+            <div className="cat-scroll-inner">
+              {CATEGORIES.map(c=>{
+                const isActive=activeCat===c.id;
+                return(
+                  <button key={c.id} className="hbtn"
+                    style={{padding:"9px 12px",background:"transparent",border:"none",
+                      borderBottom:isActive?`2px solid ${c.color}`:"2px solid transparent",
+                      color:isActive?c.color:"rgba(0,230,100,0.35)",fontSize:10,fontWeight:700,
+                      whiteSpace:"nowrap",cursor:"pointer",letterSpacing:0.3}}
+                    onClick={()=>setActiveCat(c.id)}>{c.icon} {c.short}</button>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* ── MAIN CONTENT ── */}
-        <main className="main-content" style={{flex:1,padding:"20px 28px",marginLeft:isGenerated?"220px":"0",minHeight:"calc(100vh - 54px)",transition:"margin .25s",maxWidth:"100%"}}>
-          <div style={{maxWidth:isGenerated?"1100px":"960px",margin:"0 auto"}}>
+        <main className="main-wrap" style={{marginLeft:isGenerated?"210px":"0"}}>
+          <div className="main-inner" style={{maxWidth:"1200px",margin:"0 auto"}}>
 
           {/* FLASH */}
           {flash&&(
@@ -544,11 +668,11 @@ export default function WRGDashboard(){
                 <>
                   {/* Category hero bar */}
                   <div style={{background:`linear-gradient(135deg,${accent}15,transparent)`,border:`1px solid ${accent}25`,borderRadius:14,padding:"14px 18px",marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                      <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(22px,3.5vw,40px)",color:accent,letterSpacing:3,lineHeight:1,textShadow:`0 0 20px ${accent}50`}}>{cat.icon} {cat.name}</div>
+                    <div className="hero-bar" style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+                      <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(20px,3vw,36px)",color:accent,letterSpacing:3,lineHeight:1,textShadow:`0 0 20px ${accent}50`}}>{cat.icon} {cat.name}</div>
                       {isGenerated&&<div style={{fontSize:9,color:accent,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>{fieldCfg.count} {fieldCfg.label}{fieldCfg.count>1?"S":""}</div>}
                     </div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+                    <div className="stat-grid">
                       {[["PENDING",pending.length,"#94a3b8"],["DONE",completed.length,"#10b981"],["ON HOLD",held.length,held.length>0?"#f59e0b":"#4a7a5a"],[`${fieldCfg.label}S`,fieldCfg.count,accent]].map(([l,v,c])=>(
                         <div key={l} style={{textAlign:"center",padding:"8px 6px",background:"rgba(0,0,0,0.3)",borderRadius:8,border:`1px solid ${c}20`}}>
                           <div style={{fontSize:"clamp(7px,0.8vw,9px)",color:c,fontWeight:700,letterSpacing:1,opacity:0.7}}>{l}</div>
@@ -674,7 +798,7 @@ export default function WRGDashboard(){
                         </div>
                         {gm.map(m=>(
                           <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:10,background:m.status==="held"?"rgba(245,158,11,0.03)":"transparent"}}>
-                            <div style={{flex:1,textAlign:"right",fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p1name}</div>
+                            <div className="player-name player-name-md name-clamp2" style={{flex:1,textAlign:"right",color:"#e8f5ee"}}>{m.p1name}</div>
                             <div style={{width:84,textAlign:"center"}}>
                               {m.status==="completed"?(
                                 <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4}}>
@@ -688,7 +812,7 @@ export default function WRGDashboard(){
                                 <span style={{fontSize:9,color:"rgba(0,230,100,0.25)",background:"rgba(0,230,100,0.05)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>PENDING</span>
                               )}
                             </div>
-                            <div style={{flex:1,fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",lineHeight:1.3,wordBreak:"break-word"}}>{m.p2name}</div>
+                            <div className="player-name player-name-md name-clamp2" style={{flex:1,color:"#e8f5ee"}}>{m.p2name}</div>
                           </div>
                         ))}
                       </div>
@@ -716,7 +840,7 @@ export default function WRGDashboard(){
                                 <td style={{padding:"8px 10px",textAlign:"center",color:i<2?accent:"rgba(0,230,100,0.3)",fontWeight:700,fontSize:13}}>{i+1}</td>
                                 <td style={{padding:"8px 10px",fontWeight:600,fontSize:12}}>
                                   {i<2&&<span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:accent,marginRight:7,verticalAlign:"middle"}}/>}
-                                  <span style={{fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)"}}>{r.name}</span>
+                                  <span className="player-name player-name-sm name-clamp2">{r.name}</span>
                                 </td>
                                 {["P","W","D","L","GF","GA","GD","Pts"].map(k=>(
                                   <td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:k==="Pts"?700:400,
@@ -939,6 +1063,11 @@ export default function WRGDashboard(){
                     ))}
                     <button className="hbtn" style={{marginLeft:"auto",padding:"7px 14px",background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",borderRadius:7,color:"#10b981",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllPresent}>✓ ALL PRESENT</button>
                     <button className="hbtn" style={{padding:"7px 14px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:7,color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}} onClick={markAllAbsent}>✗ ALL ABSENT</button>
+                    <button className="hbtn"
+                      style={{padding:"7px 14px",background:"rgba(239,68,68,0.05)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:7,color:"rgba(239,68,68,0.6)",fontWeight:700,fontSize:11,cursor:"pointer"}}
+                      onClick={()=>{if(window.confirm(`Clear ALL ${participants.length} participants? This cannot be undone.`)){clearAllParticipants();}}}>
+                      🗑 CLEAR ALL
+                    </button>
                   </div>
 
                   {/* CSV Import */}
@@ -1369,9 +1498,9 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           <div style={{fontSize:9,color:"#f59e0b",fontWeight:700,letterSpacing:2,marginBottom:10,textTransform:"uppercase"}}>⏸ On Hold — Release When Ready</div>
           {fieldHeld.map(m=>(
             <div key={m.id} style={{background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.15)",borderRadius:10,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:80}}><div style={{fontWeight:700,fontSize:14,color:"#f59e0b"}}>{m.p1name}</div><div style={{fontSize:9,color:"rgba(245,158,11,0.4)",marginTop:2}}>Group {m.group}</div></div>
+              <div style={{flex:1,minWidth:80}}><div className="player-name player-name-md name-clamp2" style={{color:"#f59e0b"}}>{m.p1name}</div><div style={{fontSize:9,color:"rgba(245,158,11,0.4)",marginTop:2}}>Group {m.group}</div></div>
               <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:"rgba(245,158,11,0.3)",letterSpacing:2}}>VS</div>
-              <div style={{flex:1,minWidth:80,textAlign:"right"}}><div style={{fontWeight:700,fontSize:14,color:"#f59e0b"}}>{m.p2name}</div></div>
+              <div style={{flex:1,minWidth:80,textAlign:"right"}}><div className="player-name player-name-md name-clamp2" style={{color:"#f59e0b"}}>{m.p2name}</div></div>
               <button style={{padding:"8px 16px",background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:7,color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>releaseMatch(m.id)}>▶ RELEASE</button>
             </div>
           ))}
