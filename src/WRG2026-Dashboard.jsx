@@ -944,13 +944,14 @@ export default function WRGDashboard(){
                           Array.from({length:fieldCfg.count},(_,i)=>i+1).map(f=>{
                             const fp=pending.filter(m=>m.field===f);
                             if(!fp.length) return null;
+                            const fpShow=fp.slice(0,3);
                             return(
                               <div key={f}>
                                 <div style={{padding:"7px 16px",background:`${accent}07`,borderBottom:"1px solid rgba(0,230,100,0.05)",borderTop:"1px solid rgba(0,230,100,0.04)",display:"flex",alignItems:"center",gap:8}}>
                                   <div style={{fontFamily:"'Bebas Neue'",fontSize:13,color:accent,letterSpacing:2}}>{fieldCfg.label} {f}</div>
-                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>Next {Math.min(3,fp.length)} of {fp.length}</div>
+                                  <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>Next {fpShow.length} of {fp.length}</div>
                                 </div>
-                                {fp.slice(0,3).map((m,idx)=>(
+                                {fpShow.map((m,idx)=>(
                                   <div key={m.id} className="mrow" style={{padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",background:idx===0?"rgba(0,230,100,0.025)":"transparent"}}>
                                     {/* Header row */}
                                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
