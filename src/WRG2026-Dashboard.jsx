@@ -928,7 +928,6 @@ export default function WRGDashboard(){
                                   {fd.heldList.map(m=><div key={m.id} style={{fontSize:10,color:"rgba(245,158,11,0.6)",wordBreak:"break-word"}}>{m.p1name} vs {m.p2name}</div>)}
                                 </div>
                               )}
-                              )}
                             </div>
                           );
                         })}
