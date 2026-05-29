@@ -1083,8 +1083,8 @@ export default function WRGDashboard(){
                     );
                   })}
 
-                  {/* ── PLAYER SEARCH BAR ── */}
-                  {pubTab!=="teams"&&<div style={{marginBottom:18}}>}
+                  {/* ── PLAYER SEARCH BAR — hidden on TEAMS tab ── */}
+                  {pubTab!=="teams"&&<div style={{marginBottom:18}}>
                     <div style={{position:"relative"}}>
                       <input
                         value={playerSearch}
@@ -1215,9 +1215,10 @@ export default function WRGDashboard(){
                     )}
                   </div>
 
+                  }
                   {pubTab==="teams"&&(
                     <div className="fadein">
-                      {/* Teams public view */}
+                      {/* Teams public view — direct grid, no search */}
                       {(()=>{
                         const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(activeCat));
                         const cfg=TEAM_CATEGORIES[activeCat];
