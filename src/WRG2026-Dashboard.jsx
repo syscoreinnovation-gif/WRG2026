@@ -884,7 +884,7 @@ export default function WRGDashboard(){
 
                   {/* Public tabs */}
                   <div style={{display:"flex",gap:4,marginBottom:18,background:"rgba(0,0,0,0.4)",padding:4,borderRadius:10,border:"1px solid rgba(0,230,100,0.08)",width:"fit-content"}}>
-                    {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"],...(["open2","soc4","drone"].includes(activeCat)?[["teams","👥","TEAMS"]]:[])] .map(([t,icon,label])=>(
+                    {[["fields","🏟","FIELDS"],["fixtures","📋","FIXTURES"],["standings","📊","STANDINGS"],["bracket","🏆","BRACKET"],...(["open2","soc4","drone"].includes(activeCat)?[["teams","👥","TEAMS"]]:[])].map(([t,icon,label])=>(
                       <button key={t} className="hbtn"
                         style={{padding:"7px 14px",borderRadius:8,fontWeight:700,fontSize:"clamp(9px,1vw,11px)",letterSpacing:0.8,
                           color:pubTab===t?"#050e08":"rgba(0,230,100,0.45)",
@@ -1615,10 +1615,12 @@ export default function WRGDashboard(){
                         {CATEGORIES.map(c=>{
                           const cd=data[c.id],total=(cd?.matches||[]).length,done=(cd?.matches||[]).filter(m=>m.status==="completed").length,hld=(cd?.matches||[]).filter(m=>m.status==="held").length,grps=Object.keys(cd?.groups||{}).length;
                           if(!total)return<div key={c.id} style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(0,230,100,0.04)",borderRadius:10,padding:14,opacity:0.3}}><div style={{fontSize:11,fontWeight:700,color:"rgba(0,230,100,0.3)"}}>{c.icon} {c.name}</div><div style={{fontSize:10,color:"rgba(0,230,100,0.2)",marginTop:4}}>No participants</div></div>;
+                          const allDone=total>0&&done===total;
+                          const koGenerated=!!knockoutData?.[c.id]?.generated;
                           return(
                             <div key={c.id} style={{background:S1,border:`1px solid ${c.color}20`,borderLeft:`3px solid ${c.color}`,borderRadius:10,padding:14}}>
                               <div style={{fontSize:11,fontWeight:700,marginBottom:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.icon} {c.name}</div>
-                              <div style={{display:"flex",gap:6}}>
+                              <div style={{display:"flex",gap:6,marginBottom:allDone?8:0}}>
                                 {[["GRP",grps],["DONE",`${done}/${total}`],["HOLD",hld]].map(([l,v])=>(
                                   <div key={l} style={{flex:1,background:"rgba(0,0,0,0.3)",borderRadius:5,padding:"5px 6px",textAlign:"center"}}>
                                     <div style={{fontSize:8,color:l==="HOLD"&&hld>0?"#f59e0b":"rgba(0,230,100,0.3)",fontWeight:700}}>{l}</div>
@@ -1626,6 +1628,16 @@ export default function WRGDashboard(){
                                   </div>
                                 ))}
                               </div>
+                              {allDone&&(
+                                koGenerated?(
+                                  <div style={{fontSize:9,color:"#ffd700",fontWeight:700,background:"rgba(255,215,0,0.08)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:5,padding:"4px 8px",textAlign:"center"}}>🏆 KNOCKOUT READY</div>
+                                ):(
+                                  <button className="hbtn" onClick={()=>triggerGenerateKnockout(c.id)}
+                                    style={{width:"100%",padding:"6px",background:`${c.color}15`,border:`1px solid ${c.color}40`,borderRadius:5,color:c.color,fontWeight:700,fontSize:10,cursor:"pointer"}}>
+                                    ⚡ GENERATE KNOCKOUT
+                                  </button>
+                                )
+                              )}
                             </div>
                           );
                         })}
