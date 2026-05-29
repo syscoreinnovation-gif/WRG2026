@@ -1215,6 +1215,51 @@ export default function WRGDashboard(){
                     )}
                   </div>
 
+                  {pubTab==="teams"&&(
+                    <div className="fadein">
+                      {/* Teams public view */}
+                      {(()=>{
+                        const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(activeCat));
+                        const cfg=TEAM_CATEGORIES[activeCat];
+                        return catTeams.length===0?(
+                          <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
+                            <div style={{fontSize:40,marginBottom:12}}>👥</div>
+                            <div>No teams registered yet.</div>
+                          </div>
+                        ):(
+                          <div>
+                            <div style={{fontSize:11,color:"rgba(0,230,100,0.4)",fontWeight:700,marginBottom:14,letterSpacing:1}}>
+                              {catTeams.length} TEAMS REGISTERED · {cfg?.playerCount} PLAYERS PER TEAM
+                            </div>
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+                              {catTeams.map((team,ti)=>(
+                                <div key={team.id} style={{background:"rgba(5,14,8,0.9)",border:`1px solid ${accent}20`,borderRadius:12,overflow:"hidden"}}>
+                                  <div style={{padding:"12px 14px",background:`${accent}08`,borderBottom:`1px solid ${accent}10`,display:"flex",alignItems:"center",gap:8}}>
+                                    <div style={{width:28,height:28,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:14,color:"#050e08",flexShrink:0}}>{ti+1}</div>
+                                    <div style={{fontWeight:700,fontSize:14,color:"#e8f5ee",lineHeight:1.2,wordBreak:"break-word"}}>{team.name}</div>
+                                    <div style={{marginLeft:"auto",width:8,height:8,borderRadius:"50%",flexShrink:0,background:team.attendance==="present"?"#10b981":team.attendance==="absent"?"#ef4444":"rgba(0,230,100,0.2)"}}/>
+                                  </div>
+                                  <div style={{padding:"10px 14px"}}>
+                                    {team.players?.length>0?(
+                                      team.players.map((p,pi)=>(
+                                        <div key={pi} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:pi<team.players.length-1?"1px solid rgba(0,230,100,0.04)":"none"}}>
+                                          <div style={{fontSize:9,color:accent,fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1,width:14,flexShrink:0}}>{pi+1}</div>
+                                          <div style={{fontSize:12,color:"rgba(232,245,238,0.7)",fontWeight:500,lineHeight:1.3,wordBreak:"break-word"}}>{p}</div>
+                                        </div>
+                                      ))
+                                    ):(
+                                      <div style={{fontSize:11,color:"rgba(0,230,100,0.2)",fontStyle:"italic"}}>No players listed</div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {pubTab==="bracket"&&(
                     <LiveKnockoutBracket catId={activeCat} knockoutData={knockoutData} cat={cat} accent={accent} G={G} S1={S1}
                       onScoreMatch={(roundIdx,matchIdx)=>{setKoScoreModal({catId:activeCat,roundIdx,matchIdx});setKoScoreInput({s1:"",s2:""});}}
