@@ -7,6 +7,13 @@ const STATE_REF = doc(db, "wrg2026", "state");
 
 const PINS = { judge: "S0502", admin: "S0502" };
 
+// Team categories with player counts
+const TEAM_CATEGORIES = {
+  "open2": { playerCount: 2, label: "Open Soccer 2×2" },
+  "soc4":  { playerCount: 4, label: "Soccer 4×4" },
+  "drone": { playerCount: 3, label: "Drone Soccer" },
+};
+
 const FIELD_CONFIG = {
   "diy-p":  { count:7, label:"FIELD",  color:"#00e664" },
   "diy-s":  { count:2, label:"FIELD",  color:"#00d4ff" },
@@ -227,6 +234,8 @@ export default function WRGDashboard(){
   const [judgeCategory,setJudgeCategory] = useState(null);
   const [judgeField,setJudgeField] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  const [teamForm,setTeamForm]     = useState({name:"",category:"open2",players:["",""]});
+  const [teamTab,setTeamTab]       = useState("list");
   const [syncing,setSyncing]       = useState(true);
   const [playerSearch,setPlayerSearch] = useState("");
   const [searchResults,setSearchResults] = useState([]);
@@ -484,6 +493,33 @@ export default function WRGDashboard(){
     setData(null);
     showFlash("✓ All participants cleared");
   }
+  // ── Team functions ──────────────────────────────────────
+  function selectTeamCategory(catId){
+    const count=TEAM_CATEGORIES[catId]?.playerCount||2;
+    setTeamForm(f=>({...f,category:catId,players:Array(count).fill("")}));
+  }
+  function addTeam(){
+    const{name,category,players}=teamForm;
+    if(!name.trim())return;
+    const validPlayers=players.filter(p=>p.trim());
+    const team={
+      id:`team_${Date.now()}`,
+      name:name.trim(),
+      categories:[category],
+      attendance:null,
+      isTeam:true,
+      players:validPlayers
+    };
+    const updated=[...participants,team];
+    setParticipants(updated);
+    saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
+    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill("")}));
+    showFlash(`✓ Team "${name.trim()}" registered`);
+  }
+  function updateTeamPlayer(idx,val){
+    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?val:p)}));
+  }
+
   function assignGroup(catId,group,fieldNum){
     const updated={...groupFieldMaps,[catId]:{...(groupFieldMaps[catId]||{}),[group]:fieldNum}};
     setGroupFieldMaps(updated);
@@ -1322,6 +1358,129 @@ export default function WRGDashboard(){
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {adminTab==="teams"&&(
+                <div className="fadein">
+                  {/* Teams header stats */}
+                  <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+                    {Object.entries(TEAM_CATEGORIES).map(([catId,cfg])=>{
+                      const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(catId));
+                      const cat=CATEGORIES.find(c=>c.id===catId);
+                      return(
+                        <div key={catId} style={{fontSize:11,color:cat?.color||"#00e664",fontWeight:700,background:"rgba(0,0,0,0.4)",border:`1px solid ${cat?.color||"#00e664"}25`,padding:"5px 12px",borderRadius:6}}>
+                          {cat?.icon} {cfg.label}: {catTeams.length} teams
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Team Registration Form */}
+                  <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(0,230,100,0.12)",borderRadius:12,padding:18,marginBottom:16}}>
+                    <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:14,textTransform:"uppercase"}}>Register New Team</div>
+
+                    {/* Category selector */}
+                    <div style={{marginBottom:14}}>
+                      <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Category</div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {Object.entries(TEAM_CATEGORIES).map(([catId,cfg])=>{
+                          const cat=CATEGORIES.find(c=>c.id===catId);
+                          const isSelected=teamForm.category===catId;
+                          return(
+                            <button key={catId} className="hbtn"
+                              style={{padding:"7px 14px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer",
+                                background:isSelected?`${cat?.color||"#00e664"}20`:"transparent",
+                                border:`1px solid ${isSelected?cat?.color||"#00e664":"rgba(0,230,100,0.15)"}`,
+                                color:isSelected?cat?.color||"#00e664":"rgba(0,230,100,0.4)"}}
+                              onClick={()=>selectTeamCategory(catId)}>
+                              {cat?.icon} {cfg.label}
+                              <span style={{marginLeft:6,fontSize:9,opacity:0.7}}>({cfg.playerCount} players)</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Team name */}
+                    <div style={{marginBottom:14}}>
+                      <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>Team Name</div>
+                      <input value={teamForm.name}
+                        onChange={e=>setTeamForm(f=>({...f,name:e.target.value}))}
+                        onKeyDown={e=>e.key==="Enter"&&addTeam()}
+                        placeholder="e.g. SMK Penang Utama / Team Eagle..."
+                        style={{width:"100%",background:"rgba(0,0,0,0.4)",border:`1px solid ${teamForm.name?"rgba(0,230,100,0.4)":"rgba(0,230,100,0.1)"}`,borderRadius:8,padding:"10px 14px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:13,fontWeight:500}}/>
+                    </div>
+
+                    {/* Player names */}
+                    <div style={{marginBottom:16}}>
+                      <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>
+                        Player Names ({TEAM_CATEGORIES[teamForm.category]?.playerCount} players)
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
+                        {teamForm.players.map((player,idx)=>(
+                          <div key={idx} style={{position:"relative"}}>
+                            <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1}}>{idx+1}</div>
+                            <input value={player}
+                              onChange={e=>updateTeamPlayer(idx,e.target.value)}
+                              placeholder={`Player ${idx+1} full name...`}
+                              style={{width:"100%",background:"rgba(0,0,0,0.35)",border:`1px solid ${player?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,borderRadius:7,padding:"9px 12px 9px 28px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button className="hbtn"
+                      style={{padding:"10px 24px",background:teamForm.name?`linear-gradient(135deg,#00e664,#009944)`:"rgba(0,230,100,0.05)",border:teamForm.name?"none":"1px solid rgba(0,230,100,0.1)",borderRadius:8,color:teamForm.name?"#050e08":"rgba(0,230,100,0.25)",fontWeight:700,fontSize:12,cursor:teamForm.name?"pointer":"not-allowed",boxShadow:teamForm.name?"0 4px 14px rgba(0,230,100,0.3)":"none"}}
+                      onClick={addTeam}>
+                      + REGISTER TEAM
+                    </button>
+                  </div>
+
+                  {/* Registered teams list */}
+                  {Object.entries(TEAM_CATEGORIES).map(([catId,cfg])=>{
+                    const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(catId));
+                    const cat=CATEGORIES.find(c=>c.id===catId);
+                    if(!catTeams.length) return null;
+                    return(
+                      <div key={catId} style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${cat?.color||"#00e664"}20`,borderRadius:12,overflow:"hidden",marginBottom:12}}>
+                        <div style={{padding:"10px 16px",background:`${cat?.color||"#00e664"}08`,borderBottom:`1px solid ${cat?.color||"#00e664"}15`,display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:cat?.color||"#00e664",letterSpacing:2}}>{cat?.icon} {cfg.label}</div>
+                          <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{catTeams.length} team{catTeams.length!==1?"s":""} registered</div>
+                          <div style={{marginLeft:"auto",fontSize:9,color:"rgba(0,230,100,0.3)"}}>Each team = 1 entry in tournament</div>
+                        </div>
+                        {catTeams.map((team,ti)=>(
+                          <div key={team.id} className="mrow" style={{padding:"12px 16px",borderBottom:"1px solid rgba(0,230,100,0.04)",display:"flex",alignItems:"flex-start",gap:12,
+                            background:team.attendance==="present"?"rgba(16,185,129,0.03)":team.attendance==="absent"?"rgba(239,68,68,0.03)":"transparent"}}>
+                            <div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,marginTop:5,background:team.attendance==="present"?"#10b981":team.attendance==="absent"?"#ef4444":"rgba(0,230,100,0.2)"}}/>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontWeight:700,fontSize:14,color:"#e8f5ee",marginBottom:6}}>{team.name}</div>
+                              {team.players?.length>0&&(
+                                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                                  {team.players.map((p,pi)=>(
+                                    <span key={pi} style={{fontSize:10,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.1)",padding:"2px 8px",borderRadius:4}}>
+                                      {pi+1}. {p}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{display:"flex",gap:5,flexShrink:0}}>
+                              <button className="hbtn" style={{padding:"6px 10px",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",background:team.attendance==="present"?"rgba(16,185,129,0.2)":"transparent",border:`1px solid ${team.attendance==="present"?"rgba(16,185,129,0.5)":"rgba(16,185,129,0.15)"}`,color:team.attendance==="present"?"#10b981":"rgba(16,185,129,0.4)"}} onClick={()=>markAttendance(team.id,"present")}>✓</button>
+                              <button className="hbtn" style={{padding:"6px 10px",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",background:team.attendance==="absent"?"rgba(239,68,68,0.2)":"transparent",border:`1px solid ${team.attendance==="absent"?"rgba(239,68,68,0.5)":"rgba(239,68,68,0.15)"}`,color:team.attendance==="absent"?"#ef4444":"rgba(239,68,68,0.4)"}} onClick={()=>markAttendance(team.id,"absent")}>✗</button>
+                              <button className="hbtn" style={{padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.08)",color:"rgba(0,230,100,0.25)"}} onClick={()=>removeParticipant(team.id)}>🗑</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+
+                  {!participants.some(p=>p.isTeam)&&(
+                    <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
+                      No teams registered yet. Use the form above to add teams.
+                    </div>
+                  )}
                 </div>
               )}
 
