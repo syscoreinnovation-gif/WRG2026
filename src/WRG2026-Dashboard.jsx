@@ -248,6 +248,7 @@ export default function WRGDashboard(){
   const [flash,setFlash]           = useState(null);
   const [participants,setParticipants] = useState([]);
   const [addForm,setAddForm]       = useState({name:"",cats:[],studentId:"",side:""});
+  const [editingId,setEditingId]   = useState(null);
   const [searchQ,setSearchQ]       = useState("");
   const [attFilter,setAttFilter]   = useState("all");
   const [catFilter,setCatFilter]   = useState(null);
@@ -503,6 +504,22 @@ export default function WRGDashboard(){
   function lockView(){setAuth(a=>({...a,[view]:false}));setJudgeField(null);setJudgeCategory(null);setView("public");}
   function addParticipant(){
     if(!addForm.name.trim()||!addForm.cats.length)return;
+    // Duplicate check by name or ID
+    const nameLower=addForm.name.trim().toLowerCase();
+    const dup=participants.find(p=>
+      p.name.toLowerCase()===nameLower||
+      (addForm.studentId&&p.studentId&&p.studentId===addForm.studentId)
+    );
+    if(dup){
+      // Merge categories instead of adding duplicate
+      const merged=[...new Set([...dup.categories,...addForm.cats])];
+      const updated=participants.map(p=>p.id===dup.id?{...p,categories:merged,studentId:addForm.studentId||dup.studentId}:p);
+      setParticipants(updated);
+      saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
+      setAddForm({name:"",cats:[],studentId:"",side:""});
+      showFlash(`↗ Merged categories into existing "${dup.name}"`);
+      return;
+    }
     const newP={id:`p${Date.now()}`,name:addForm.name.trim(),studentId:addForm.studentId||"",side:addForm.side||"",categories:addForm.cats,attendance:null};
     const updated=[...participants,newP];
     setParticipants(updated);
@@ -1450,8 +1467,44 @@ export default function WRGDashboard(){
                         <div style={{display:"flex",gap:5,flexShrink:0}}>
                           <button className="hbtn" style={{padding:"6px 12px",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",background:p.attendance==="present"?"rgba(16,185,129,0.2)":"transparent",border:`1px solid ${p.attendance==="present"?"rgba(16,185,129,0.5)":"rgba(16,185,129,0.15)"}`,color:p.attendance==="present"?"#10b981":"rgba(16,185,129,0.4)"}} onClick={()=>markAttendance(p.id,"present")}>✓</button>
                           <button className="hbtn" style={{padding:"6px 12px",borderRadius:6,fontSize:11,fontWeight:700,cursor:"pointer",background:p.attendance==="absent"?"rgba(239,68,68,0.2)":"transparent",border:`1px solid ${p.attendance==="absent"?"rgba(239,68,68,0.5)":"rgba(239,68,68,0.15)"}`,color:p.attendance==="absent"?"#ef4444":"rgba(239,68,68,0.4)"}} onClick={()=>markAttendance(p.id,"absent")}>✗</button>
+                          <button className="hbtn" style={{padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:editingId===p.id?"rgba(0,230,100,0.1)":"transparent",border:`1px solid ${editingId===p.id?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.1)"}`,color:editingId===p.id?"#00e664":"rgba(0,230,100,0.3)"}} onClick={()=>setEditingId(editingId===p.id?null:p.id)}>✏</button>
                           <button className="hbtn" style={{padding:"6px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.08)",color:"rgba(0,230,100,0.25)"}} onClick={()=>removeParticipant(p.id)}>🗑</button>
                         </div>
+                        {editingId===p.id&&(
+                          <div style={{marginTop:8,padding:"10px 12px",background:"rgba(0,0,0,0.3)",borderRadius:8,border:"1px solid rgba(0,230,100,0.12)"}}>
+                            <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                              <input defaultValue={p.name} id={`ename-${p.id}`}
+                                style={{flex:"1 1 140px",background:"rgba(0,0,0,0.4)",border:"1px solid rgba(0,230,100,0.2)",borderRadius:6,padding:"7px 10px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}
+                                placeholder="Full name"/>
+                              <input defaultValue={p.studentId||""} id={`esid-${p.id}`}
+                                style={{flex:"0 1 120px",background:"rgba(0,0,0,0.4)",border:"1px solid rgba(0,230,100,0.1)",borderRadius:6,padding:"7px 10px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}
+                                placeholder="Student ID"/>
+                            </div>
+                            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+                              {CATEGORIES.map(c=>(
+                                <button key={c.id} className="hbtn"
+                                  style={{padding:"3px 8px",borderRadius:4,fontSize:10,fontWeight:700,cursor:"pointer",
+                                    background:p.categories.includes(c.id)?`${c.color}20`:"transparent",
+                                    border:`1px solid ${p.categories.includes(c.id)?c.color:"rgba(0,230,100,0.1)"}`,
+                                    color:p.categories.includes(c.id)?c.color:"rgba(0,230,100,0.3)"}}
+                                  onClick={()=>{
+                                    const cats=p.categories.includes(c.id)?p.categories.filter(x=>x!==c.id):[...p.categories,c.id];
+                                    const updated=participants.map(x=>x.id===p.id?{...x,categories:cats}:x);
+                                    setParticipants(updated);saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
+                                  }}>{c.icon} {c.short}</button>
+                              ))}
+                            </div>
+                            <button className="hbtn"
+                              style={{padding:"6px 14px",background:"linear-gradient(135deg,#00e664,#009944)",border:"none",borderRadius:6,color:"#050e08",fontWeight:700,fontSize:11,cursor:"pointer"}}
+                              onClick={()=>{
+                                const nm=document.getElementById(`ename-${p.id}`)?.value||p.name;
+                                const sid=document.getElementById(`esid-${p.id}`)?.value||"";
+                                const updated=participants.map(x=>x.id===p.id?{...x,name:nm.trim(),studentId:sid.trim()}:x);
+                                setParticipants(updated);saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
+                                setEditingId(null);showFlash("✓ Updated");
+                              }}>SAVE CHANGES</button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2401,7 +2454,17 @@ function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
       const cats=[];
       cols.slice(catStart).forEach(col=>{const key=col.toLowerCase().trim(),catId=CAT_ALIASES[key];if(catId&&!cats.includes(catId))cats.push(catId);else if(!catId&&col)errs.push(`Row ${i+2}: unknown category "${col}"`);});
       if(!cats.length){errs.push(`Row ${i+2}: "${name}" has no valid categories`);return;}
-      parsed.push({id:`csv_${Date.now()}_${i}`,name,studentId:studentId||"",categories:cats,attendance:null});
+      // Check for duplicate — merge if same name or same ID
+      const existDup=existingParticipants?.find(p=>
+        p.name.toLowerCase()===name.toLowerCase()||
+        (studentId&&p.studentId&&p.studentId===studentId)
+      );
+      if(existDup){
+        // Flag as merge
+        parsed.push({id:existDup.id,name:existDup.name,studentId:studentId||existDup.studentId,categories:[...new Set([...existDup.categories,...cats])],attendance:existDup.attendance,_merge:true});
+      } else {
+        parsed.push({id:`csv_${Date.now()}_${i}`,name,studentId:studentId||"",categories:cats,attendance:null});
+      }
     });
     if(errs.length)setError(errs.slice(0,3).join(" · ")+(errs.length>3?` +${errs.length-3} more`:""));
     setPreview(parsed);
