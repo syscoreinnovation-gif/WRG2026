@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { db } from "./firebase.js";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 
-// Firestore document reference — v2.1
+// Firestore document reference
 const STATE_REF = doc(db, "wrg2026", "state");
 
 const PINS = { judge: "S0502", admin: "S0502" };
@@ -14,8 +14,21 @@ const TEAM_CATEGORIES = {
   "drone": { playerCount: 3, label: "Drone Soccer" },
 };
 
+// DIY Soccer sides configuration
+// DIY Soccer sides config
+const DIY_SIDES = {
+  "diy-p": {
+    A:{ label:"Sathish Anne", fields:[1,2,3,4] },
+    B:{ label:"Param Sir",    fields:[5,6,7,8] }
+  },
+  "diy-s": {
+    A:{ label:"Sathish Anne", fields:[1] },
+    B:{ label:"Param Sir",    fields:[2] }
+  }
+};
+
 const FIELD_CONFIG = {
-  "diy-p":  { count:7, label:"FIELD",  color:"#00e664" },
+  "diy-p":  { count:8, label:"FIELD",  color:"#00e664" },
   "diy-s":  { count:2, label:"FIELD",  color:"#00d4ff" },
   "open2":  { count:2, label:"FIELD",  color:"#ff6b35" },
   "soc4":   { count:1, label:"FIELD",  color:"#ffd700" },
@@ -91,7 +104,16 @@ function generateTournament(participants,groupFieldMaps){
     const fieldGroupRounds={}; // {field: {groupLabel: [[match,...], [match,...], ...]}}
     sizes.forEach((size,gi)=>{
       const label=L[gi],members=present.slice(idx,idx+size);idx+=size;
-      groups[label]=members.map(p=>({id:p.id,name:p.name,group:label,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
+      // Assign side for DIY Soccer categories
+      const catSides=DIY_SIDES[cat.id];
+      let side="";
+      if(catSides){
+        const sideAFields=catSides.sideA.fields;
+        const fmap2=groupFieldMaps[cat.id]||{},fc2=FIELD_CONFIG[cat.id].count;
+        const fieldForGroup=fmap2[label]||(gi%fc2)+1;
+        side=sideAFields.includes(fieldForGroup)?"A":"B";
+      }
+      groups[label]=members.map(p=>({id:p.id,name:p.name,group:label,side,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
       const fmap=groupFieldMaps[cat.id]||{},fc=FIELD_CONFIG[cat.id].count,field=fmap[label]||(gi%fc)+1;
       if(!fieldGroupRounds[field])fieldGroupRounds[field]={};
       // Generate Berger rounds for this group
@@ -219,12 +241,13 @@ export default function WRGDashboard(){
   const [adminTab,setAdminTab]     = useState("participants");
   const [activeCat,setActiveCat]   = useState("diy-p");
   const [pubTab,setPubTab]         = useState("fields");
+  const [activeSide,setActiveSide] = useState("A");
   const [data,setData]             = useState(null);
   const [auth,setAuth]             = useState({judge:false,admin:false});
   const [pinModal,setPinModal]     = useState({open:false,target:null,input:"",error:false,shake:false});
   const [flash,setFlash]           = useState(null);
   const [participants,setParticipants] = useState([]);
-  const [addForm,setAddForm]       = useState({name:"",cats:[]});
+  const [addForm,setAddForm]       = useState({name:"",cats:[],studentId:"",side:""});
   const [searchQ,setSearchQ]       = useState("");
   const [attFilter,setAttFilter]   = useState("all");
   const [catFilter,setCatFilter]   = useState(null);
@@ -234,13 +257,17 @@ export default function WRGDashboard(){
   const [judgeCategory,setJudgeCategory] = useState(null);
   const [judgeField,setJudgeField] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  const [scoringCat,setScoringCat]   = useState(CATEGORIES[0]?.id||"diy-p");
+  const [scoringField,setScoringField] = useState(1);
   const [teamForm,setTeamForm]     = useState({name:"",category:"open2",players:["",""]});
   const [teamTab,setTeamTab]       = useState("list");
   const [syncing,setSyncing]       = useState(true);
   const [playerSearch,setPlayerSearch] = useState("");
   const [searchResults,setSearchResults] = useState([]);
   const [showSearch,setShowSearch] = useState(false);
-  const [knockoutData,setKnockoutData] = useState({});
+  const [knockoutData,setKnockoutData]   = useState({});
+  const [scoreCat,setScoreCat]           = useState(null);
+  const [scoreField,setScoreField]       = useState(null);
   const [koScoreModal,setKoScoreModal] = useState(null);
   const [koScoreInput,setKoScoreInput] = useState({s1:"",s2:""});
 
@@ -316,7 +343,7 @@ export default function WRGDashboard(){
   const absentCount=participants.filter(p=>p.attendance==="absent").length;
   const unmarkedCount=participants.filter(p=>!p.attendance).length;
   const attFiltered=useMemo(()=>participants
-    .filter(p=>p.name.toLowerCase().includes(searchQ.toLowerCase()))
+    .filter(p=>p.name.toLowerCase().includes(searchQ.toLowerCase())||(p.studentId||"").toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p=>!catFilter||p.categories.includes(catFilter))
     .filter(p=>attFilter==="all"||(attFilter==="present"&&p.attendance==="present")||(attFilter==="absent"&&p.attendance==="absent")||(attFilter==="unmarked"&&!p.attendance))
   ,[participants,searchQ,catFilter,attFilter]);
@@ -428,6 +455,41 @@ export default function WRGDashboard(){
     showFlash("✓ Score saved — winner advances!");
   }
 
+  function confirmManualDraw(catId, slots){
+    // Build bracket from manual slot assignment
+    const rounds=[];
+    const r1=slots.map((slot,idx)=>({
+      id:`ko-${catId}-0-${idx}`,
+      p1:slot?{id:slot.id,name:slot.name,seed:slot.seed}:null,
+      p2:null,score1:null,score2:null,status:"pending",
+      winnerId:null,winnerName:null,winnerSeed:null
+    }));
+    // Pair slots: slot 0 vs slot 1, slot 2 vs slot 3, etc.
+    const r1Paired=[];
+    for(let i=0;i<r1.length;i+=2){
+      r1Paired.push({
+        id:`ko-${catId}-0-${i/2}`,
+        p1:r1[i]?.p1||null,
+        p2:r1[i+1]?.p1||null,
+        score1:null,score2:null,status:"pending",
+        winnerId:null,winnerName:null,winnerSeed:null
+      });
+    }
+    rounds.push(r1Paired);
+    let prev=r1Paired;
+    while(prev.length>1){
+      const next=Array.from({length:Math.ceil(prev.length/2)},(_,i)=>({
+        id:`ko-${catId}-${rounds.length}-${i}`,p1:null,p2:null,
+        score1:null,score2:null,status:"waiting",winnerId:null,winnerName:null,winnerSeed:null
+      }));
+      rounds.push(next);prev=next;
+    }
+    const updated={...knockoutData,[catId]:{bracketSize:slots.length,rounds,generated:true,manualDraw:true}};
+    setKnockoutData(updated);
+    saveState({participants,groupFieldMaps,tournamentData:data,knockoutData:updated});
+    showFlash("🏆 Bracket confirmed!");
+  }
+
   function requestView(t){
     if(t==="public"){setView("public");setSidebarOpen(false);return;}
     if(auth[t]){setView(t);setSidebarOpen(false);return;}
@@ -441,7 +503,7 @@ export default function WRGDashboard(){
   function lockView(){setAuth(a=>({...a,[view]:false}));setJudgeField(null);setJudgeCategory(null);setView("public");}
   function addParticipant(){
     if(!addForm.name.trim()||!addForm.cats.length)return;
-    const newP={id:`p${Date.now()}`,name:addForm.name.trim(),categories:addForm.cats,attendance:null};
+    const newP={id:`p${Date.now()}`,name:addForm.name.trim(),studentId:addForm.studentId||"",side:addForm.side||"",categories:addForm.cats,attendance:null};
     const updated=[...participants,newP];
     setParticipants(updated);
     saveState({participants:updated,groupFieldMaps,tournamentData:data});
@@ -778,7 +840,7 @@ export default function WRGDashboard(){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <div style={{display:"flex",gap:2,background:"rgba(0,0,0,0.5)",padding:3,borderRadius:8,border:"1px solid rgba(0,230,100,0.1)"}}>
-            {[["public","👁","PUBLIC"],["judge",auth.judge?"📋":"🔒","JUDGE"],["admin",auth.admin?"⚙":"🔒","ADMIN"]].map(([v,icon,label])=>(
+            {[["public","👁","PUBLIC"],["admin",auth.admin?"⚙":"🔒","ADMIN"]].map(([v,icon,label])=>(
               <button key={v} className="hbtn"
                 style={{padding:"6px 12px",borderRadius:6,fontWeight:700,fontSize:"clamp(9px,1vw,11px)",letterSpacing:0.5,
                   color:view===v?"#050e08":"rgba(0,230,100,0.5)",
@@ -1013,7 +1075,14 @@ export default function WRGDashboard(){
 
 
                   {/* FIXTURES */}
-                  {pubTab==="fixtures"&&Object.keys(catData.groups||{}).sort().map(g=>{
+
+                  {pubTab==="fixtures"&&Object.keys(catData.groups||{}).sort()
+                    .filter(g=>{
+                      if(!DIY_SIDES[activeCat])return true;
+                      const m=catData.matches?.find(mm=>mm.group===g);
+                      if(!m)return true;
+                      return(DIY_SIDES[activeCat][activeSide]?.fields||[]).includes(m.field);
+                    }).map(g=>{
                     const gm=catMatches.filter(m=>m.group===g);
                     return(
                       <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
@@ -1046,13 +1115,28 @@ export default function WRGDashboard(){
                   })}
 
                   {/* STANDINGS */}
-                  {pubTab==="standings"&&Object.keys(catData.groups||{}).sort().map(g=>{
+
+                  {pubTab==="standings"&&Object.keys(catData.groups||{}).sort()
+                    .filter(g=>{
+                      if(!DIY_SIDES[activeCat])return true;
+                      const m=catData.matches?.find(mm=>mm.group===g);
+                      if(!m)return true;
+                      return(DIY_SIDES[activeCat][activeSide]?.fields||[]).includes(m.field);
+                    }).map(g=>{
                     const rows=standings[g]||[];
                     return(
                       <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
                         <div style={{background:`linear-gradient(90deg,${accent}14,transparent)`,padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",alignItems:"center",gap:10}}>
                           <div style={{width:26,height:26,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:15,color:"#050e08"}}>{g}</div>
                           <span style={{fontWeight:700,fontSize:13}}>GROUP {g}</span>
+                          {DIY_SIDES[activeCat]&&(
+                            <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:4,
+                              background:activeSide==="A"?"rgba(0,230,100,0.1)":"rgba(255,215,0,0.1)",
+                              color:activeSide==="A"?"#00e664":"#ffd700",
+                              border:`1px solid ${activeSide==="A"?"rgba(0,230,100,0.25)":"rgba(255,215,0,0.25)"}`}}>
+                              SIDE {activeSide} · {DIY_SIDES[activeCat][activeSide]?.label}
+                            </span>
+                          )}
                         </div>
                         <div style={{overflowX:"auto"}}>
                           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
@@ -1083,8 +1167,9 @@ export default function WRGDashboard(){
                     );
                   })}
 
+
                   {/* ── PLAYER SEARCH BAR — hidden on TEAMS tab ── */}
-                  {pubTab!=="teams"&&<div style={{marginBottom:18}}>
+                  {pubTab!=="teams"&&(<div style={{marginBottom:18}}>
                     <div style={{position:"relative"}}>
                       <input
                         value={playerSearch}
@@ -1213,51 +1298,11 @@ export default function WRGDashboard(){
                         Search will be available once the tournament is generated
                       </div>
                     )}
-                  </div>
+                  </div>)}
 
-                  }
                   {pubTab==="teams"&&(
                     <div className="fadein">
-                      {/* Teams public view — direct grid, no search */}
-                      {(()=>{
-                        const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(activeCat));
-                        const cfg=TEAM_CATEGORIES[activeCat];
-                        return catTeams.length===0?(
-                          <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
-                            <div style={{fontSize:40,marginBottom:12}}>👥</div>
-                            <div>No teams registered yet.</div>
-                          </div>
-                        ):(
-                          <div>
-                            <div style={{fontSize:11,color:"rgba(0,230,100,0.4)",fontWeight:700,marginBottom:14,letterSpacing:1}}>
-                              {catTeams.length} TEAMS REGISTERED · {cfg?.playerCount} PLAYERS PER TEAM
-                            </div>
-                            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
-                              {catTeams.map((team,ti)=>(
-                                <div key={team.id} style={{background:"rgba(5,14,8,0.9)",border:`1px solid ${accent}20`,borderRadius:12,overflow:"hidden"}}>
-                                  <div style={{padding:"12px 14px",background:`${accent}08`,borderBottom:`1px solid ${accent}10`,display:"flex",alignItems:"center",gap:8}}>
-                                    <div style={{width:28,height:28,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:14,color:"#050e08",flexShrink:0}}>{ti+1}</div>
-                                    <div style={{fontWeight:700,fontSize:14,color:"#e8f5ee",lineHeight:1.2,wordBreak:"break-word"}}>{team.name}</div>
-                                    <div style={{marginLeft:"auto",width:8,height:8,borderRadius:"50%",flexShrink:0,background:team.attendance==="present"?"#10b981":team.attendance==="absent"?"#ef4444":"rgba(0,230,100,0.2)"}}/>
-                                  </div>
-                                  <div style={{padding:"10px 14px"}}>
-                                    {team.players?.length>0?(
-                                      team.players.map((p,pi)=>(
-                                        <div key={pi} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:pi<team.players.length-1?"1px solid rgba(0,230,100,0.04)":"none"}}>
-                                          <div style={{fontSize:9,color:accent,fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1,width:14,flexShrink:0}}>{pi+1}</div>
-                                          <div style={{fontSize:12,color:"rgba(232,245,238,0.7)",fontWeight:500,lineHeight:1.3,wordBreak:"break-word"}}>{p}</div>
-                                        </div>
-                                      ))
-                                    ):(
-                                      <div style={{fontSize:11,color:"rgba(0,230,100,0.2)",fontStyle:"italic"}}>No players listed</div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      <TeamsPublicView participants={participants} activeCat={activeCat} accent={accent} TEAM_CATEGORIES={TEAM_CATEGORIES}/>
                     </div>
                   )}
 
@@ -1268,7 +1313,7 @@ export default function WRGDashboard(){
                       onGenerateKnockout={()=>triggerGenerateKnockout(activeCat)}
                       groupStageComplete={catMatches.length>0&&catMatches.every(m=>m.status==="completed")}/>
                   )}
-                </div>  
+                </div>
               )}
             </div>
           )}
@@ -1289,7 +1334,7 @@ export default function WRGDashboard(){
           {view==="admin"&&(
             <div className="fadein">
               <div style={{display:"flex",gap:4,marginBottom:20,background:"rgba(0,0,0,0.4)",padding:4,borderRadius:10,border:"1px solid rgba(0,230,100,0.08)",width:"fit-content"}}>
-                {[["participants","👥 PARTICIPANTS"],["teams","🏆 TEAMS"],["generate",isGenerated?"📊 TOURNAMENT":"⚡ GENERATE"]].map(([t,label])=>(
+                {[["participants","👥 PARTICIPANTS"],["teams","🏆 TEAMS"],["score","⚽ SCORING"],["generate",isGenerated?"📊 TOURNAMENT":"⚡ GENERATE"]].map(([t,label])=>(
                   <button key={t} className="hbtn"
                     style={{padding:"8px 16px",borderRadius:7,fontWeight:700,fontSize:"clamp(10px,1.1vw,12px)",letterSpacing:0.5,
                       color:adminTab===t?"#050e08":"rgba(0,230,100,0.4)",
@@ -1342,6 +1387,9 @@ export default function WRGDashboard(){
                       <input value={addForm.name} onChange={e=>setAddForm(f=>({...f,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&addParticipant()}
                         placeholder="Full name..."
                         style={{flex:"1 1 160px",background:"rgba(0,0,0,0.4)",border:`1px solid ${addForm.name?"rgba(0,230,100,0.4)":"rgba(0,230,100,0.1)"}`,borderRadius:8,padding:"9px 12px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:13,fontWeight:500}}/>
+                      <input value={addForm.studentId||""} onChange={e=>setAddForm(f=>({...f,studentId:e.target.value}))}
+                        placeholder="Student ID (optional)..."
+                        style={{flex:"0 1 160px",background:"rgba(0,0,0,0.4)",border:`1px solid ${addForm.studentId?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,borderRadius:8,padding:"9px 12px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
                       <button className="hbtn" style={{padding:"9px 16px",background:addForm.name&&addForm.cats.length?G:"rgba(0,230,100,0.08)",borderRadius:8,color:addForm.name&&addForm.cats.length?"#050e08":"rgba(0,230,100,0.3)",fontWeight:700,fontSize:12,cursor:"pointer",boxShadow:addForm.name&&addForm.cats.length?`0 4px 14px ${G}35`:"none"}} onClick={addParticipant}>+ ADD</button>
                     </div>
                     <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1.5,marginBottom:7,textTransform:"uppercase"}}>Categories</div>
@@ -1526,6 +1574,72 @@ export default function WRGDashboard(){
                     <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
                       No teams registered yet. Use the form above to add teams.
                     </div>
+                  )}
+                </div>
+              )}
+
+              {adminTab==="score"&&(
+                <div className="fadein">
+                  {/* Admin Scoring Panel - replaces judge view */}
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color:G,letterSpacing:3,marginBottom:16}}>⚽ FIELD SCORING</div>
+                  {!isGenerated?(
+                    <div style={{textAlign:"center",padding:40,color:"rgba(0,230,100,0.3)"}}>Generate the tournament first.</div>
+                  ):(
+                    <div>
+                      {/* Category + Field selector */}
+                      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:6}}>CATEGORY</div>
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                            {CATEGORIES.map(c=>{
+                              const cd=data[c.id];
+                              if(!cd?.matches?.length)return null;
+                              return(
+                                <button key={c.id} className="hbtn"
+                                  style={{padding:"6px 12px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer",
+                                    background:scoringCat===c.id?`${c.color}20`:"transparent",
+                                    border:`1px solid ${scoringCat===c.id?c.color:"rgba(0,230,100,0.1)"}`,
+                                    color:scoringCat===c.id?c.color:"rgba(0,230,100,0.35)"}}
+                                  onClick={()=>{setScoringCat(c.id);setScoringField(1);}}>
+                                  {c.icon} {c.short}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <AdminScoringView data={data} scoringCat={scoringCat} scoringField={scoringField} setScoringField={setScoringField} FIELD_CONFIG={FIELD_CONFIG} holdMatch={holdMatch} releaseMatch={releaseMatch} openScoreModal={openScoreModal}/>
+                    </div>
+                  )}
+                </div>
+              )}
+
+                            {adminTab==="score"&&(
+                <div className="fadein">
+                  {!isGenerated?(
+                    <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
+                      <div style={{fontSize:40,marginBottom:12}}>🎯</div>
+                      <div>Generate the tournament first to start scoring.</div>
+                    </div>
+                  ):(
+                    <JudgePanel
+                      isGenerated={isGenerated}
+                      judgeCategory={scoreCat}
+                      judgeField={scoreField}
+                      CATEGORIES={CATEGORIES}
+                      FIELD_CONFIG={FIELD_CONFIG}
+                      tournamentData={data}
+                      groupFieldMaps={groupFieldMaps}
+                      participants={participants}
+                      selectJudgeCategory={cat=>{setScoreCat(cat);setScoreField(null);}}
+                      selectJudgeField={setScoreField}
+                      changeJudgeCategory={()=>{setScoreCat(null);setScoreField(null);}}
+                      setJudgeField={setScoreField}
+                      holdMatch={(catId,matchId)=>holdMatch(catId,matchId)}
+                      releaseMatch={(catId,matchId)=>releaseMatch(catId,matchId)}
+                      openScoreModal={openScoreModal}
+                      G={G} S1={S1} BD={BD} BG={BG}
+                    />
                   )}
                 </div>
               )}
@@ -2117,6 +2231,137 @@ function LiveKnockoutBracket({catId,knockoutData,cat,accent,G,S1,onScoreMatch,is
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// MANUAL BRACKET DRAW — Drag & Drop qualifier seeding
+// ═══════════════════════════════════════════════════════════
+function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw}){
+  const cd=catData?.[catId];
+  const [slots,setSlots]=React.useState([]);
+  const [dragging,setDragging]=React.useState(null);
+  const [initialized,setInitialized]=React.useState(false);
+
+  // Build qualifiers list from standings
+  const standings=cd?calcStandings(cd.groups,cd.matches):{};
+  const groups=Object.keys(standings).sort();
+  const qualifiers=[];
+  groups.forEach(g=>{
+    const sorted=standings[g]||[];
+    if(sorted[0])qualifiers.push({...sorted[0],seed:`1${g}`,rank:1,group:g});
+    if(sorted[1])qualifiers.push({...sorted[1],seed:`2${g}`,rank:2,group:g});
+  });
+
+  const totalQual=qualifiers.length;
+  let bracketSize=2;while(bracketSize<totalQual)bracketSize*=2;
+  const slotCount=bracketSize/2;
+
+  React.useEffect(()=>{
+    if(!initialized&&slotCount>0){
+      setSlots(Array(slotCount).fill(null));
+      setInitialized(true);
+    }
+  },[slotCount,initialized]);
+
+  const usedIds=new Set(slots.filter(Boolean).map(s=>s.id));
+  const available=qualifiers.filter(q=>!usedIds.has(q.id));
+
+  function handleDrop(slotIdx){
+    if(dragging===null)return;
+    const newSlots=[...slots];
+    // If dragging from slot, clear it
+    if(typeof dragging==="object"&&dragging.fromSlot!==undefined){
+      newSlots[dragging.fromSlot]=null;
+      newSlots[slotIdx]=dragging.qualifier;
+    } else {
+      // Dragging from qualifiers list
+      newSlots[slotIdx]=dragging;
+    }
+    setSlots(newSlots);setDragging(null);
+  }
+
+  function handleSlotDragStart(slotIdx){
+    if(slots[slotIdx])setDragging({fromSlot:slotIdx,qualifier:slots[slotIdx]});
+  }
+
+  function clearSlot(idx){setSlots(s=>s.map((v,i)=>i===idx?null:v));}
+
+  const allFilled=slots.length>0&&slots.every(Boolean);
+
+  if(!cd?.matches?.length)return<div style={{textAlign:"center",padding:40,color:"rgba(0,230,100,0.3)"}}>No tournament data yet.</div>;
+
+  return(
+    <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+      {/* Qualifiers Panel */}
+      <div style={{width:220,flexShrink:0}}>
+        <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:10}}>QUALIFIERS ({qualifiers.length})</div>
+        <div style={{fontSize:9,color:"rgba(0,230,100,0.25)",marginBottom:10}}>Drag into bracket slots →</div>
+        {groups.map(g=>{
+          const gQuals=qualifiers.filter(q=>q.group===g);
+          return(
+            <div key={g} style={{marginBottom:8}}>
+              <div style={{fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700,letterSpacing:1,marginBottom:4}}>GROUP {g}</div>
+              {gQuals.map(q=>{
+                const used=usedIds.has(q.id);
+                return(
+                  <div key={q.id}
+                    draggable={!used}
+                    onDragStart={()=>setDragging(q)}
+                    onDragEnd={()=>setDragging(null)}
+                    style={{padding:"7px 10px",marginBottom:4,borderRadius:7,cursor:used?"default":"grab",
+                      background:used?"rgba(0,0,0,0.2)":`${accent}12`,
+                      border:`1px solid ${used?"rgba(0,230,100,0.05)":accent+"30"}`,
+                      opacity:used?0.4:1,transition:"all .2s"}}>
+                    <div style={{fontSize:9,color:used?"rgba(0,230,100,0.2)":accent,fontWeight:700}}>{q.rank===1?"🥇":"🥈"} {q.seed}</div>
+                    <div style={{fontSize:11,fontWeight:600,color:used?"rgba(232,245,238,0.3)":"rgba(232,245,238,0.8)",wordBreak:"break-word",lineHeight:1.3,marginTop:2}}>{q.name}</div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bracket Slots */}
+      <div style={{flex:1,minWidth:220}}>
+        <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:10}}>
+          BRACKET DRAW — Round of {bracketSize} ({slotCount} matches)
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginBottom:16}}>
+          {slots.map((slot,idx)=>(
+            <div key={idx}
+              onDragOver={e=>e.preventDefault()}
+              onDrop={()=>handleDrop(idx)}
+              style={{borderRadius:10,border:`2px dashed ${slot?accent+"50":"rgba(0,230,100,0.15)"}`,
+                background:slot?`${accent}08`:"rgba(0,0,0,0.2)",
+                minHeight:72,transition:"all .2s",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:5,left:8,fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>SLOT {idx+1}</div>
+              {slot?(
+                <div style={{padding:"18px 10px 8px"}}>
+                  <div style={{fontSize:9,color:accent,fontWeight:700,marginBottom:2}}>{slot.seed}</div>
+                  <div style={{fontWeight:700,fontSize:12,color:"#e8f5ee",wordBreak:"break-word",lineHeight:1.3,cursor:"grab"}}
+                    draggable onDragStart={()=>handleSlotDragStart(idx)}>{slot.name}</div>
+                  <button onClick={()=>clearSlot(idx)} style={{marginTop:4,fontSize:9,color:"rgba(239,68,68,0.5)",background:"none",border:"none",cursor:"pointer",padding:0}}>✕ remove</button>
+                </div>
+              ):(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:72,color:"rgba(0,230,100,0.2)",fontSize:11}}>
+                  Drop here
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <button
+          style={{padding:"10px 24px",background:allFilled?`linear-gradient(135deg,${accent},#009944)`:"rgba(0,0,0,0.3)",
+            border:allFilled?"none":"1px solid rgba(0,230,100,0.1)",borderRadius:8,
+            color:allFilled?"#050e08":"rgba(0,230,100,0.25)",fontWeight:700,fontSize:13,
+            cursor:allFilled?"pointer":"not-allowed",boxShadow:allFilled?`0 4px 18px ${accent}35`:"none"}}
+          onClick={()=>allFilled&&onConfirmDraw(slots)}>
+          {allFilled?"⚡ CONFIRM DRAW & GENERATE BRACKET":"Fill all slots to confirm draw"}
+        </button>
       </div>
     </div>
   );
