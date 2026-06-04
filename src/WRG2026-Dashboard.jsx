@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { db } from "./firebase.js";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 
-// Firestore document reference
+// Firestore document reference v3
 const STATE_REF = doc(db, "wrg2026", "state");
 
 const PINS = { judge: "S0502", admin: "S0502" };
