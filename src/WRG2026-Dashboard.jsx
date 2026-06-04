@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { db } from "./firebase.js";
 import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 
-// Firestore document reference v3
+// Firestore document reference
 const STATE_REF = doc(db, "wrg2026", "state");
 
 const PINS = { judge: "S0502", admin: "S0502" };
@@ -93,14 +93,107 @@ function genRRRounds(members){
   return rounds;
 }
 
-function generateTournament(participants,groupFieldMaps){
+function generateTournament(participants,groupFieldMaps,manualGroups,diyAreas){
   const catData={};
+  const DIY_CATS_LOCAL=["diy-p","diy-s"];
+  const L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   CATEGORIES.forEach(cat=>{
     const present=participants.filter(p=>p.attendance==="present"&&p.categories.includes(cat.id));
     if(!present.length){catData[cat.id]={groups:{},matches:[]};return;}
-    const sizes=calcGroupSizes(present.length),groups={},L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // ── Manual group assignment (non-DIY) ─────────────────
+    if(!DIY_CATS_LOCAL.includes(cat.id)&&manualGroups&&manualGroups[cat.id]){
+      const assignments=manualGroups[cat.id];
+      const groupLetters=[...new Set(Object.values(assignments))].sort();
+      if(groupLetters.length>0){
+        const groups={};const fieldGroupRounds={};
+        groupLetters.forEach(letter=>{
+          const members=present.filter(p=>assignments[p.id]===letter);
+          if(!members.length)return;
+          groups[letter]=members.map(p=>({id:p.id,name:p.name,group:letter,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
+          const fc=FIELD_CONFIG[cat.id].count;
+          const field=(groupFieldMaps[cat.id]||{})[letter]||(L.indexOf(letter)%fc)+1;
+          if(!fieldGroupRounds[field])fieldGroupRounds[field]={};
+          fieldGroupRounds[field][letter]=genRRRounds(members).map((round,ri)=>
+            round.map((pair,mi)=>({
+              id:`${cat.id}-${letter}-${ri}-${mi}`,catId:cat.id,group:letter,
+              p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
+              score1:null,score2:null,status:"pending",field
+            }))
+          );
+        });
+        const interleavedMatches=[];
+        Object.keys(fieldGroupRounds).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
+          const groupLabels=Object.keys(fieldGroupRounds[field]);
+          const allGroupRounds=fieldGroupRounds[field];
+          const maxRounds=Math.max(...groupLabels.map(g=>allGroupRounds[g].length));
+          for(let ri=0;ri<maxRounds;ri++){
+            const roundPerGroup=groupLabels.map(g=>allGroupRounds[g][ri]||[]);
+            const maxMatchesInRound=Math.max(...roundPerGroup.map(m=>m.length));
+            for(let mi=0;mi<maxMatchesInRound;mi++){
+              roundPerGroup.forEach(gm=>{if(gm[mi])interleavedMatches.push(gm[mi]);});
+            }
+          }
+        });
+        catData[cat.id]={groups,matches:interleavedMatches};
+        return;
+      }
+    }
+
+    // ── DIY Soccer area split ──────────────────────────────
+    if(DIY_CATS_LOCAL.includes(cat.id)&&diyAreas&&diyAreas[cat.id]){
+      const areaMap=diyAreas[cat.id];
+      const area1=present.filter(p=>areaMap[p.id]==="1");
+      const area2=present.filter(p=>areaMap[p.id]==="2");
+      const unassigned=present.filter(p=>!areaMap[p.id]);
+      // Merge unassigned into whichever area is smaller
+      unassigned.forEach((p,i)=>{if(i%2===0)area1.push(p);else area2.push(p);});
+      const fc=FIELD_CONFIG[cat.id].count;
+      const halfFields=Math.floor(fc/2);
+      const area1Fields=Array.from({length:halfFields},(_,i)=>i+1);
+      const area2Fields=Array.from({length:fc-halfFields},(_,i)=>i+halfFields+1);
+      const groups={};const fieldGroupRounds={};
+      const processArea=(members,fields)=>{
+        if(!members.length)return;
+        const sizes=calcGroupSizes(members.length);
+        let idx=0;
+        sizes.forEach((size,gi)=>{
+          const letter=L[gi+(groups?Object.keys(groups).length:0)];
+          const aMembers=members.slice(idx,idx+size);idx+=size;
+          groups[letter]=aMembers.map(p=>({id:p.id,name:p.name,group:letter,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
+          const field=fields[gi%fields.length];
+          if(!fieldGroupRounds[field])fieldGroupRounds[field]={};
+          fieldGroupRounds[field][letter]=genRRRounds(aMembers).map((round,ri)=>
+            round.map((pair,mi)=>({
+              id:`${cat.id}-${letter}-${ri}-${mi}`,catId:cat.id,group:letter,
+              p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
+              score1:null,score2:null,status:"pending",field
+            }))
+          );
+        });
+      };
+      processArea(area1,area1Fields);
+      processArea(area2,area2Fields);
+      const interleavedMatches=[];
+      Object.keys(fieldGroupRounds).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
+        const groupLabels=Object.keys(fieldGroupRounds[field]);
+        const allGroupRounds=fieldGroupRounds[field];
+        const maxRounds=Math.max(...groupLabels.map(g=>allGroupRounds[g].length));
+        for(let ri=0;ri<maxRounds;ri++){
+          const roundPerGroup=groupLabels.map(g=>allGroupRounds[g][ri]||[]);
+          const maxMatchesInRound=Math.max(...roundPerGroup.map(m=>m.length));
+          for(let mi=0;mi<maxMatchesInRound;mi++){
+            roundPerGroup.forEach(gm=>{if(gm[mi])interleavedMatches.push(gm[mi]);});
+          }
+        }
+      });
+      catData[cat.id]={groups,matches:interleavedMatches};
+      return;
+    }
+
+    // ── Default auto-generate ──────────────────────────────
+    const sizes=calcGroupSizes(present.length),groups={};
     let idx=0;
-    // Build per-field, per-group round schedules
     const fieldGroupRounds={}; // {field: {groupLabel: [[match,...], [match,...], ...]}}
     sizes.forEach((size,gi)=>{
       const label=L[gi],members=present.slice(idx,idx+size);idx+=size;
@@ -241,7 +334,10 @@ export default function WRGDashboard(){
   const [adminTab,setAdminTab]     = useState("participants");
   const [activeCat,setActiveCat]   = useState("diy-p");
   const [pubTab,setPubTab]         = useState("fields");
-  const [activeSide,setActiveSide] = useState("A");
+  const [activeSide,setActiveSide]   = useState("A");
+  const [manualGroups,setManualGroups] = useState({});   // {catId: {pid: "A"|"B"|"C"...}}
+  const [diyAreas,setDiyAreas]         = useState({});   // {catId: {pid: "1"|"2"}}
+  const [setupCat,setSetupCat]         = useState(null); // which cat is being configured
   const [data,setData]             = useState(null);
   const [auth,setAuth]             = useState({judge:false,admin:false});
   const [pinModal,setPinModal]     = useState({open:false,target:null,input:"",error:false,shake:false});
@@ -491,6 +587,44 @@ export default function WRGDashboard(){
     showFlash("🏆 Bracket confirmed!");
   }
 
+  // ── Manual group & area helpers ─────────────────────────
+  const DIY_CATS = ["diy-p","diy-s"];
+  const MANUAL_CATS = CATEGORIES.filter(c=>!DIY_CATS.includes(c.id)).map(c=>c.id);
+
+  function assignToGroup(catId, pid, group){
+    setManualGroups(prev=>{
+      const updated={...prev,[catId]:{...(prev[catId]||{}),[pid]:group}};
+      return updated;
+    });
+  }
+  function assignToDiyArea(catId, pid, area){
+    setDiyAreas(prev=>({...prev,[catId]:{...(prev[catId]||{}),[pid]:area}}));
+  }
+  function getParticipantsForCat(catId){
+    return participants.filter(p=>p.attendance==="present"&&p.categories.includes(catId));
+  }
+  function getGroupsForCat(catId){
+    const assignments=manualGroups[catId]||{};
+    const groups={};
+    Object.entries(assignments).forEach(([pid,grp])=>{
+      if(!groups[grp])groups[grp]=[];
+      groups[grp].push(pid);
+    });
+    return groups;
+  }
+  function autoSplitDIY(catId){
+    const pList=getParticipantsForCat(catId);
+    const half=Math.ceil(pList.length/2);
+    const areas={};
+    pList.forEach((p,i)=>{areas[p.id]=i<half?"1":"2";});
+    setDiyAreas(prev=>({...prev,[catId]:areas}));
+    showFlash("Auto-split evenly between Area 1 & Area 2");
+  }
+  function clearGroupAssignments(catId){
+    setManualGroups(prev=>{const n={...prev};delete n[catId];return n;});
+    showFlash("Group assignments cleared");
+  }
+
   function requestView(t){
     if(t==="public"){setView("public");setSidebarOpen(false);return;}
     if(auth[t]){setView(t);setSidebarOpen(false);return;}
@@ -551,7 +685,7 @@ export default function WRGDashboard(){
   }
   function generateTournamentHandler(){
     if(presentCount===0){showFlash("⚠ No participants marked present");return;}
-    const tournament=generateTournament(participants,groupFieldMaps);
+    const tournament=generateTournament(participants,groupFieldMaps,manualGroups,diyAreas);
     setData(tournament);
     saveState({participants,groupFieldMaps,tournamentData:tournament});
     setAdminTab("overview");showFlash("🏆 Tournament is LIVE!");
@@ -1702,6 +1836,206 @@ export default function WRGDashboard(){
 
               {adminTab==="generate"&&(
                 <div>
+                  {/* ── GROUP SETUP SECTION ── */}
+                  <div style={{marginBottom:20}}>
+                    <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:G,letterSpacing:2,marginBottom:12}}>⚙ GROUP SETUP</div>
+                    {/* Category selector */}
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+                      {CATEGORIES.filter(c=>getParticipantsForCat(c.id).length>0).map(c=>{
+                        const isDIY=DIY_CATS.includes(c.id);
+                        const catPpts=getParticipantsForCat(c.id);
+                        const assigned=isDIY
+                          ?Object.keys(diyAreas[c.id]||{}).length
+                          :Object.keys(manualGroups[c.id]||{}).length;
+                        const allDone=catPpts.length>0&&assigned>=catPpts.length;
+                        return(
+                          <button key={c.id} className="hbtn"
+                            style={{padding:"7px 14px",borderRadius:8,fontSize:11,fontWeight:700,cursor:"pointer",
+                              background:setupCat===c.id?`${c.color}20`:allDone?"rgba(16,185,129,0.08)":"rgba(0,0,0,0.3)",
+                              border:`1px solid ${setupCat===c.id?c.color:allDone?"rgba(16,185,129,0.3)":"rgba(0,230,100,0.1)"}`,
+                              color:setupCat===c.id?c.color:allDone?"#10b981":"rgba(0,230,100,0.4)"}}
+                            onClick={()=>setSetupCat(setupCat===c.id?null:c.id)}>
+                            {c.icon} {c.short}
+                            <span style={{marginLeft:5,fontSize:9,opacity:0.7}}>
+                              {allDone?"✓ done":`${assigned}/${catPpts.length}`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* DIY Soccer Area Split */}
+                    {setupCat&&DIY_CATS.includes(setupCat)&&(()=>{
+                      const cat=CATEGORIES.find(c=>c.id===setupCat);
+                      const ppts=getParticipantsForCat(setupCat);
+                      const areas=diyAreas[setupCat]||{};
+                      const area1=ppts.filter(p=>areas[p.id]==="1");
+                      const area2=ppts.filter(p=>areas[p.id]==="2");
+                      const unassigned=ppts.filter(p=>!areas[p.id]);
+                      return(
+                        <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${cat.color}20`,borderRadius:12,padding:16}}>
+                          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
+                            <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:cat.color,letterSpacing:2}}>{cat.icon} {cat.name} — AREA SPLIT</div>
+                            <div style={{fontSize:10,color:"rgba(0,230,100,0.4)"}}>{ppts.length} participants · {unassigned.length} unassigned</div>
+                            <button className="hbtn" onClick={()=>autoSplitDIY(setupCat)}
+                              style={{padding:"5px 12px",background:"rgba(0,230,100,0.08)",border:"1px solid rgba(0,230,100,0.2)",borderRadius:6,color:G,fontSize:10,fontWeight:700,cursor:"pointer",marginLeft:"auto"}}>
+                              ⚡ AUTO-SPLIT EVENLY
+                            </button>
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                            {/* Unassigned */}
+                            <div>
+                              <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1,marginBottom:6}}>UNASSIGNED ({unassigned.length})</div>
+                              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
+                                {unassigned.map(p=>(
+                                  <div key={p.id} style={{display:"flex",gap:4,alignItems:"center",background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"5px 8px"}}>
+                                    <div style={{flex:1,fontSize:11,color:"rgba(232,245,238,0.7)",lineHeight:1.2,wordBreak:"break-word"}}>{p.name}</div>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,"1")} style={{padding:"2px 7px",borderRadius:4,fontSize:9,fontWeight:700,cursor:"pointer",background:"rgba(0,230,100,0.1)",border:"1px solid rgba(0,230,100,0.2)",color:G,flexShrink:0}}>→1</button>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,"2")} style={{padding:"2px 7px",borderRadius:4,fontSize:9,fontWeight:700,cursor:"pointer",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.2)",color:"#ffd700",flexShrink:0}}>→2</button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Area 1 */}
+                            <div>
+                              <div style={{fontSize:9,color:G,fontWeight:700,letterSpacing:1,marginBottom:6}}>AREA 1 — SATHISH ({area1.length}) · Fields 1-4+S1</div>
+                              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
+                                {area1.map(p=>(
+                                  <div key={p.id} style={{display:"flex",gap:4,alignItems:"center",background:"rgba(0,230,100,0.05)",border:"1px solid rgba(0,230,100,0.1)",borderRadius:6,padding:"5px 8px"}}>
+                                    <div style={{flex:1,fontSize:11,color:"rgba(232,245,238,0.8)",lineHeight:1.2,wordBreak:"break-word"}}>{p.name}</div>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,"2")} style={{padding:"2px 6px",borderRadius:4,fontSize:9,cursor:"pointer",background:"transparent",border:"1px solid rgba(255,215,0,0.2)",color:"#ffd700",flexShrink:0}}>→2</button>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,null)} style={{padding:"2px 6px",borderRadius:4,fontSize:9,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.1)",color:"rgba(0,230,100,0.3)",flexShrink:0}}>✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Area 2 */}
+                            <div>
+                              <div style={{fontSize:9,color:"#ffd700",fontWeight:700,letterSpacing:1,marginBottom:6}}>AREA 2 — PARAM ({area2.length}) · Fields 5-8+S2</div>
+                              <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:300,overflowY:"auto"}}>
+                                {area2.map(p=>(
+                                  <div key={p.id} style={{display:"flex",gap:4,alignItems:"center",background:"rgba(255,215,0,0.04)",border:"1px solid rgba(255,215,0,0.1)",borderRadius:6,padding:"5px 8px"}}>
+                                    <div style={{flex:1,fontSize:11,color:"rgba(232,245,238,0.8)",lineHeight:1.2,wordBreak:"break-word"}}>{p.name}</div>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,"1")} style={{padding:"2px 6px",borderRadius:4,fontSize:9,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.2)",color:G,flexShrink:0}}>→1</button>
+                                    <button className="hbtn" onClick={()=>assignToDiyArea(setupCat,p.id,null)} style={{padding:"2px 6px",borderRadius:4,fontSize:9,cursor:"pointer",background:"transparent",border:"1px solid rgba(255,215,0,0.1)",color:"rgba(255,215,0,0.3)",flexShrink:0}}>✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Manual Group Assignment (non-DIY) */}
+                    {setupCat&&!DIY_CATS.includes(setupCat)&&(()=>{
+                      const cat=CATEGORIES.find(c=>c.id===setupCat);
+                      const ppts=getParticipantsForCat(setupCat);
+                      const assignments=manualGroups[setupCat]||{};
+                      const unassigned=ppts.filter(p=>!assignments[p.id]);
+                      const groupLetters=[...new Set(Object.values(assignments))].sort();
+                      const allLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+                      const nextLetter=allLetters.find(l=>!groupLetters.includes(l))||"A";
+                      const fieldCfg=FIELD_CONFIG[setupCat];
+                      return(
+                        <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${cat.color}20`,borderRadius:12,padding:16}}>
+                          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,flexWrap:"wrap"}}>
+                            <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:cat.color,letterSpacing:2}}>{cat.icon} {cat.name} — GROUP ASSIGNMENT</div>
+                            <div style={{fontSize:10,color:"rgba(0,230,100,0.4)"}}>{ppts.length} participants · {unassigned.length} unassigned</div>
+                            <div style={{marginLeft:"auto",display:"flex",gap:6}}>
+                              <button className="hbtn"
+                                onClick={()=>{
+                                  // Auto-distribute evenly across existing groups (or create groups)
+                                  const numGroups=Math.max(groupLetters.length||Math.ceil(ppts.length/6),1);
+                                  const newAssign={...assignments};
+                                  unassigned.forEach((p,i)=>{newAssign[p.id]=allLetters[i%numGroups];});
+                                  setManualGroups(prev=>({...prev,[setupCat]:newAssign}));
+                                  showFlash("Auto-distributed unassigned participants");
+                                }}
+                                style={{padding:"5px 12px",background:"rgba(0,230,100,0.08)",border:"1px solid rgba(0,230,100,0.2)",borderRadius:6,color:G,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                                ⚡ AUTO-FILL
+                              </button>
+                              <button className="hbtn" onClick={()=>clearGroupAssignments(setupCat)}
+                                style={{padding:"5px 12px",background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.15)",borderRadius:6,color:"#ef4444",fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                                🗑 CLEAR
+                              </button>
+                            </div>
+                          </div>
+                          {/* Unassigned pool */}
+                          {unassigned.length>0&&(
+                            <div style={{marginBottom:14}}>
+                              <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1,marginBottom:6}}>UNASSIGNED ({unassigned.length}) — tap a group button to assign</div>
+                              <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                                {unassigned.map(p=>(
+                                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(0,0,0,0.3)",borderRadius:6,padding:"6px 10px",flexWrap:"wrap"}}>
+                                    <div style={{flex:1,fontSize:12,fontWeight:600,color:"rgba(232,245,238,0.7)",lineHeight:1.2,wordBreak:"break-word",minWidth:100}}>
+                                      {p.name}{p.studentId&&<span style={{marginLeft:6,fontSize:9,color:"rgba(0,230,100,0.4)",background:"rgba(0,230,100,0.06)",padding:"1px 5px",borderRadius:3}}>{p.studentId}</span>}
+                                    </div>
+                                    <div style={{display:"flex",gap:4,flexWrap:"wrap",flexShrink:0}}>
+                                      {allLetters.slice(0,Math.max(groupLetters.length+1,2)).map(letter=>(
+                                        <button key={letter} className="hbtn"
+                                          onClick={()=>assignToGroup(setupCat,p.id,letter)}
+                                          style={{padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",
+                                            background:`${cat.color}15`,border:`1px solid ${cat.color}40`,color:cat.color}}>
+                                          {letter}
+                                        </button>
+                                      ))}
+                                      <button className="hbtn"
+                                        onClick={()=>assignToGroup(setupCat,p.id,nextLetter)}
+                                        style={{padding:"3px 10px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",
+                                          background:"rgba(0,230,100,0.04)",border:"1px dashed rgba(0,230,100,0.2)",color:"rgba(0,230,100,0.4)"}}>
+                                        +{nextLetter}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* Assigned groups */}
+                          {groupLetters.length>0&&(
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                              {groupLetters.map(letter=>{
+                                const members=ppts.filter(p=>assignments[p.id]===letter);
+                                const fieldNum=groupFieldMaps[setupCat]?.[letter]||(allLetters.indexOf(letter)%fieldCfg.count)+1;
+                                return(
+                                  <div key={letter} style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${cat.color}20`,borderRadius:8,overflow:"hidden"}}>
+                                    <div style={{padding:"7px 10px",background:`${cat.color}10`,borderBottom:`1px solid ${cat.color}15`,display:"flex",alignItems:"center",gap:8}}>
+                                      <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:cat.color,letterSpacing:2}}>GROUP {letter}</div>
+                                      <div style={{fontSize:9,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{members.length} players</div>
+                                      <select value={fieldNum}
+                                        onChange={e=>{
+                                          const fv=Number(e.target.value);
+                                          const updated={...(groupFieldMaps[setupCat]||{}),[letter]:fv};
+                                          const newMaps={...groupFieldMaps,[setupCat]:updated};
+                                          setGroupFieldMaps(newMaps);
+                                          saveState({participants,groupFieldMaps:newMaps,tournamentData:data,knockoutData});
+                                        }}
+                                        style={{marginLeft:"auto",background:"rgba(0,0,0,0.4)",border:"1px solid rgba(0,230,100,0.15)",borderRadius:4,color:G,fontSize:9,padding:"2px 4px",cursor:"pointer"}}>
+                                        {Array.from({length:fieldCfg.count},(_,i)=>i+1).map(f=>(
+                                          <option key={f} value={f}>{fieldCfg.label} {f}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div style={{padding:"6px 8px",display:"flex",flexDirection:"column",gap:3}}>
+                                      {members.map(p=>(
+                                        <div key={p.id} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(232,245,238,0.7)"}}>
+                                          <span style={{flex:1,lineHeight:1.2,wordBreak:"break-word"}}>{p.name}</span>
+                                          <button className="hbtn" onClick={()=>assignToGroup(setupCat,p.id,null)}
+                                            style={{fontSize:9,color:"rgba(0,230,100,0.3)",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>✕</button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                   {!isGenerated?(
                     <div>
                       <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,24px)",color:G,letterSpacing:3,marginBottom:6}}>GENERATE TOURNAMENT</div>
