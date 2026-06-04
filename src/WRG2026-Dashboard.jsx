@@ -1439,7 +1439,10 @@ export default function WRGDashboard(){
                         background:p.attendance==="present"?"rgba(16,185,129,0.03)":p.attendance==="absent"?"rgba(239,68,68,0.03)":"transparent"}}>
                         <div style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:p.attendance==="present"?"#10b981":p.attendance==="absent"?"#ef4444":"rgba(0,230,100,0.2)"}}/>
                         <div style={{flex:1,minWidth:120}}>
-                          <div style={{fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",color:p.attendance==="absent"?"rgba(232,245,238,0.3)":"#e8f5ee"}}>{p.name}</div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                            <div style={{fontWeight:700,fontSize:"clamp(12px,1.3vw,14px)",color:p.attendance==="absent"?"rgba(232,245,238,0.3)":"#e8f5ee"}}>{p.name}</div>
+                            {p.studentId&&<span style={{fontSize:10,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.12)",padding:"1px 7px",borderRadius:3,fontWeight:700,flexShrink:0,letterSpacing:0.5}}>{p.studentId}</span>}
+                          </div>
                           <div style={{display:"flex",gap:3,marginTop:3,flexWrap:"wrap"}}>
                             {p.categories.map(cid=>{const c=CATEGORIES.find(x=>x.id===cid);return c?(<span key={cid} style={{fontSize:9,color:c.color,background:`${c.color}12`,padding:"1px 6px",borderRadius:3,fontWeight:700,opacity:p.attendance==="absent"?0.3:1}}>{c.icon} {c.short}</span>):null;})}
                           </div>
@@ -2392,10 +2395,13 @@ function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
       const cols=line.split(",").map(c=>c.trim()).filter(Boolean);
       if(!cols.length)return;
       const name=cols[0];if(!name){errs.push(`Row ${i+2}: missing name`);return;}
+      // Auto-detect Student ID: if col[1] is not a category code, treat it as ID
+      let studentId="",catStart=1;
+      if(cols.length>1){const col1key=cols[1].toLowerCase().trim();if(!CAT_ALIASES[col1key]){studentId=cols[1];catStart=2;}}
       const cats=[];
-      cols.slice(1).forEach(col=>{const key=col.toLowerCase().trim(),catId=CAT_ALIASES[key];if(catId&&!cats.includes(catId))cats.push(catId);else if(!catId)errs.push(`Row ${i+2}: unknown category "${col}"`);});
+      cols.slice(catStart).forEach(col=>{const key=col.toLowerCase().trim(),catId=CAT_ALIASES[key];if(catId&&!cats.includes(catId))cats.push(catId);else if(!catId&&col)errs.push(`Row ${i+2}: unknown category "${col}"`);});
       if(!cats.length){errs.push(`Row ${i+2}: "${name}" has no valid categories`);return;}
-      parsed.push({id:`csv_${Date.now()}_${i}`,name,categories:cats,attendance:null});
+      parsed.push({id:`csv_${Date.now()}_${i}`,name,studentId:studentId||"",categories:cats,attendance:null});
     });
     if(errs.length)setError(errs.slice(0,3).join(" · ")+(errs.length>3?` +${errs.length-3} more`:""));
     setPreview(parsed);
