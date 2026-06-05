@@ -1519,10 +1519,30 @@ export default function WRGDashboard(){
                   {/* CSV Import */}
                   <CsvImport CATEGORIES={CATEGORIES}
                     onImport={(p)=>{
-                      const updated=[...participants,...p];
-                      setParticipants(updated);
-                      saveState({participants:updated,groupFieldMaps,tournamentData:data});
-                      showFlash(`✓ ${p.length} imported`);
+                      let merged=0,added=0;
+                      const result=[...participants];
+                      p.forEach(newP=>{
+                        // Find existing by same ID or same name
+                        const existIdx=result.findIndex(ex=>
+                          (newP.studentId&&ex.studentId&&ex.studentId===newP.studentId)||
+                          ex.name.toLowerCase().trim()===newP.name.toLowerCase().trim()
+                        );
+                        if(existIdx>=0){
+                          // Merge categories
+                          const ex=result[existIdx];
+                          result[existIdx]={...ex,
+                            categories:[...new Set([...ex.categories,...newP.categories])],
+                            studentId:ex.studentId||newP.studentId||""
+                          };
+                          merged++;
+                        } else {
+                          result.push(newP);
+                          added++;
+                        }
+                      });
+                      setParticipants(result);
+                      saveState({participants:result,groupFieldMaps,tournamentData:data,knockoutData});
+                      showFlash(`✓ ${added} added · ${merged} merged`);
                     }}
                     onReplace={(p)=>{
                       setParticipants(p);
