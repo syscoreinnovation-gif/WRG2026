@@ -1739,16 +1739,49 @@ export default function WRGDashboard(){
                   </div>
 
                   {/* Registered teams list — filtered by selected category */}
-                  <TeamsListView
-                    catId={teamForm.category}
-                    participants={participants}
-                    teamGroups={teamGroups}
-                    setTeamGroups={setTeamGroups}
-                    markAttendance={markAttendance}
-                    removeParticipant={removeParticipant}
-                    CATEGORIES={CATEGORIES}
-                    TEAM_CATEGORIES={TEAM_CATEGORIES}
-                  />
+                  {participants.filter(p=>p.isTeam&&p.categories.includes(teamForm.category)).map((team,ti)=>{
+                    const cat=CATEGORIES.find(c=>c.id===teamForm.category);
+                    const accent2=cat?.color||"#00e664";
+                    const grp=teamGroups[team.id];
+                    const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(teamForm.category));
+                    const usedG=[...new Set(catTeams.map(t=>teamGroups[t.id]).filter(Boolean))].sort();
+                    const allL="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+                    const nextG=allL.find(l=>!usedG.includes(l))||"A";
+                    const showG=usedG.length>0?[...usedG,nextG]:[nextG];
+                    return(
+                      <div key={team.id} style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${accent2}15`,borderRadius:10,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10}}>
+                        <div style={{width:26,height:26,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:14,background:grp?`${accent2}20`:"rgba(0,0,0,0.3)",color:grp?accent2:"rgba(0,230,100,0.2)",border:`1px solid ${grp?accent2+"40":"rgba(0,230,100,0.08)"}`}}>{grp||"?"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee",marginBottom:5}}>{team.name}</div>
+                          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                            {(team.players||[]).map((p,pi)=>{
+                              const pName=typeof p==="object"?p.name:p;
+                              const pId=typeof p==="object"?p.studentId:"";
+                              return <span key={pi} style={{fontSize:10,color:`${accent2}99`,background:`${accent2}08`,border:`1px solid ${accent2}15`,padding:"2px 7px",borderRadius:4}}>{pi+1}. {pName}{pId&&` [${pId}]`}</span>;
+                            })}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+                          <div style={{display:"flex",gap:2}}>
+                            {showG.map(l=>(
+                              <button key={l} className="hbtn" onClick={()=>setTeamGroups(prev=>({...prev,[team.id]:grp===l?null:l}))}
+                                style={{padding:"3px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",background:grp===l?`${accent2}25`:"transparent",border:`1px solid ${grp===l?accent2:"rgba(0,230,100,0.15)"}`,color:grp===l?accent2:"rgba(0,230,100,0.3)"}}>
+                                {l}
+                              </button>
+                            ))}
+                          </div>
+                          <div style={{display:"flex",gap:2,justifyContent:"flex-end"}}>
+                            <button className="hbtn" style={{padding:"4px 7px",borderRadius:4,fontSize:11,cursor:"pointer",background:team.attendance==="present"?"rgba(16,185,129,0.2)":"transparent",border:"1px solid rgba(16,185,129,0.2)",color:team.attendance==="present"?"#10b981":"rgba(16,185,129,0.3)",fontWeight:700}} onClick={()=>markAttendance(team.id,"present")}>✓</button>
+                            <button className="hbtn" style={{padding:"4px 7px",borderRadius:4,fontSize:11,cursor:"pointer",background:team.attendance==="absent"?"rgba(239,68,68,0.2)":"transparent",border:"1px solid rgba(239,68,68,0.2)",color:team.attendance==="absent"?"#ef4444":"rgba(239,68,68,0.3)",fontWeight:700}} onClick={()=>markAttendance(team.id,"absent")}>✗</button>
+                            <button className="hbtn" style={{padding:"4px 7px",borderRadius:4,fontSize:11,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.08)",color:"rgba(0,230,100,0.25)"}} onClick={()=>removeParticipant(team.id)}>🗑</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {!participants.some(p=>p.isTeam&&p.categories.includes(teamForm.category))&&(
+                    <div style={{textAlign:"center",padding:"30px",color:"rgba(0,230,100,0.25)",fontSize:13}}>No {TEAM_CATEGORIES[teamForm.category]?.label} teams yet.</div>
+                  )}
 
                   {!participants.some(p=>p.isTeam)&&(
                     <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
