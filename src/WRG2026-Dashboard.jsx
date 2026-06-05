@@ -2935,6 +2935,87 @@ function TeamsListView({catId,participants,teamGroups,setTeamGroups,markAttendan
 }
 
 // ═══════════════════════════════════════════════════════════
+// TEAMS PUBLIC VIEW
+// ═══════════════════════════════════════════════════════════
+function TeamsPublicView({participants,activeCat,accent,TEAM_CATEGORIES}){
+  const cfg=TEAM_CATEGORIES[activeCat];
+  const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(activeCat));
+  if(!catTeams.length) return <div style={{textAlign:"center",padding:40,color:"rgba(0,230,100,0.25)",fontSize:13}}>No teams registered yet.</div>;
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
+      {catTeams.map(team=>(
+        <div key={team.id} style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${accent}20`,borderRadius:10,padding:"12px 14px"}}>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:accent,letterSpacing:2,marginBottom:8}}>{team.name}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            {(team.players||[]).map((p,pi)=>{
+              const pName=typeof p==="object"?(p.name||""):String(p||"");
+              const pId=typeof p==="object"?(p.studentId||""):"";
+              return(
+                <div key={pi} style={{fontSize:11,color:"rgba(232,245,238,0.7)",display:"flex",gap:6,alignItems:"center"}}>
+                  <span style={{color:accent,fontWeight:700,fontSize:10}}>{pi+1}.</span>
+                  {pName}
+                  {pId&&<span style={{fontSize:9,color:`${accent}60`,background:`${accent}08`,padding:"0 4px",borderRadius:3}}>{pId}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADMIN SCORING VIEW
+// ═══════════════════════════════════════════════════════════
+function AdminScoringView({data,scoringCat,scoringField,setScoringField,FIELD_CONFIG,holdMatch,releaseMatch,openScoreModal}){
+  const fieldCfg=FIELD_CONFIG[scoringCat];
+  const catM=(data[scoringCat]?.matches)||[];
+  const fieldMatches=catM.filter(m=>m.field===scoringField);
+  const pending=fieldMatches.filter(m=>m.status==="pending");
+  const held=fieldMatches.filter(m=>m.status==="held");
+  const queue=[...pending,...held].slice(0,8);
+  const accent2=fieldCfg?.color||"#00e664";
+  return(
+    <div>
+      {/* Field selector */}
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {Array.from({length:fieldCfg?.count||1},(_,i)=>i+1).map(f=>(
+          <button key={f} className="hbtn"
+            style={{padding:"7px 14px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer",
+              background:scoringField===f?`${accent2}20`:"rgba(0,0,0,0.3)",
+              border:`1px solid ${scoringField===f?accent2+"50":"rgba(0,230,100,0.1)"}`,
+              color:scoringField===f?accent2:"rgba(0,230,100,0.4)"}}
+            onClick={()=>setScoringField(f)}>
+            {fieldCfg?.label||"Field"} {f}
+          </button>
+        ))}
+      </div>
+      {/* Match queue */}
+      {queue.length===0?(
+        <div style={{textAlign:"center",padding:30,color:"rgba(0,230,100,0.3)",fontSize:13}}>No pending matches on this field</div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {queue.map(m=>(
+            <div key={m.id} style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${accent2}15`,borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"rgba(0,230,100,0.4)",marginBottom:4}}>Group {m.group} · {m.status==="held"?"⏸ HELD":"⏳ PENDING"}</div>
+                <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee"}}>{m.p1name} <span style={{color:accent2}}>vs</span> {m.p2name}</div>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {m.status==="pending"&&<button className="hbtn" style={{padding:"5px 10px",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",fontSize:10,fontWeight:700,cursor:"pointer"}} onClick={()=>holdMatch(m.id)}>⏸ HOLD</button>}
+                {m.status==="held"&&<button className="hbtn" style={{padding:"5px 10px",background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",borderRadius:6,color:"#10b981",fontSize:10,fontWeight:700,cursor:"pointer"}} onClick={()=>releaseMatch(m.id)}>▶ RELEASE</button>}
+                <button className="hbtn" style={{padding:"5px 14px",background:"linear-gradient(135deg,#00e664,#009944)",border:"none",borderRadius:6,color:"#050e08",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>openScoreModal(m)}>SCORE</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
 // CSV IMPORT
 // ═══════════════════════════════════════════════════════════
 function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
