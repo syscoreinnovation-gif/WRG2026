@@ -1739,14 +1739,17 @@ export default function WRGDashboard(){
                   </div>
 
                   {/* Registered teams list — filtered by selected category */}
-                  {(()=>{
-                    const catId=teamForm.category;
-                    const cfg=TEAM_CATEGORIES[catId];
-                    const cat=CATEGORIES.find(c=>c.id===catId);
-                    const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(catId));
-                    if(!catTeams.length) return <div style={{textAlign:"center",padding:"30px",color:"rgba(0,230,100,0.25)",fontSize:13}}>No {cfg?.label} teams yet.</div>;
-                    const groupLetters=[...new Set(Object.values(teamGroups).filter(Boolean))].sort();
-                    return(
+                  <TeamsListView
+                    catId={teamForm.category}
+                    participants={participants}
+                    teamGroups={teamGroups}
+                    setTeamGroups={setTeamGroups}
+                    markAttendance={markAttendance}
+                    removeParticipant={removeParticipant}
+                    CATEGORIES={CATEGORIES}
+                    TEAM_CATEGORIES={TEAM_CATEGORIES}
+                  />
+                  {false&&(
                       <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${cat?.color||"#00e664"}20`,borderRadius:12,overflow:"hidden"}}>
                         <div style={{padding:"10px 16px",background:`${cat?.color||"#00e664"}08`,borderBottom:`1px solid ${cat?.color||"#00e664"}15`,display:"flex",alignItems:"center",gap:10}}>
                           <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:cat?.color||"#00e664",letterSpacing:2}}>{cat?.icon} {cfg?.label}</div>
@@ -1807,14 +1810,7 @@ export default function WRGDashboard(){
                           );
                         })}
                       </div>
-                    );
-                  })()}
-
-                  {!participants.some(p=>p.isTeam)&&(
-                    <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
-                      No teams registered yet. Use the form above to add teams.
-                    </div>
-                  )}
+                    )}
 
                   {!participants.some(p=>p.isTeam)&&(
                     <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
@@ -2870,6 +2866,95 @@ function PlayerSearchInput({idx,value,studentId,participants,onChange,accent}){
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEAMS LIST VIEW — filtered by category with group assignment
+// ═══════════════════════════════════════════════════════════
+function TeamsListView({catId,participants,teamGroups,setTeamGroups,markAttendance,removeParticipant,CATEGORIES,TEAM_CATEGORIES}){
+  const cfg=TEAM_CATEGORIES[catId];
+  const cat=CATEGORIES.find(c=>c.id===catId);
+  const accent=cat?.color||"#00e664";
+  const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(catId));
+
+  if(!catTeams.length){
+    return(
+      <div style={{textAlign:"center",padding:"30px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
+        No {cfg?.label||catId} teams yet. Register above.
+      </div>
+    );
+  }
+
+  const usedGroups=[...new Set(catTeams.map(t=>teamGroups[t.id]).filter(Boolean))].sort();
+  const allLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const nextGrp=allLetters.find(l=>!usedGroups.includes(l))||"A";
+  const showGrps=usedGroups.length>0?[...usedGroups,nextGrp]:[nextGrp];
+
+  return(
+    <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${accent}20`,borderRadius:12,overflow:"hidden"}}>
+      {/* Header */}
+      <div style={{padding:"10px 16px",background:`${accent}08`,borderBottom:`1px solid ${accent}15`,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:14,color:accent,letterSpacing:2}}>{cat?.icon} {cfg?.label}</div>
+        <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{catTeams.length} team{catTeams.length!==1?"s":""}</div>
+        <div style={{marginLeft:"auto",fontSize:9,color:"rgba(0,230,100,0.3)"}}>Click A B C to assign groups</div>
+      </div>
+      {/* Teams */}
+      {catTeams.map(team=>{
+        const grp=teamGroups[team.id];
+        return(
+          <div key={team.id} style={{padding:"12px 16px",borderBottom:`1px solid ${accent}08`,display:"flex",alignItems:"flex-start",gap:10,
+            background:grp?`${accent}04`:"transparent"}}>
+            {/* Group badge */}
+            <div style={{width:26,height:26,borderRadius:6,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+              fontFamily:"'Bebas Neue'",fontSize:14,letterSpacing:1,
+              background:grp?`${accent}20`:"rgba(0,0,0,0.3)",
+              color:grp?accent:"rgba(0,230,100,0.2)",
+              border:`1px solid ${grp?accent+"40":"rgba(0,230,100,0.08)"}`}}>
+              {grp||"?"}
+            </div>
+            {/* Team info */}
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee",marginBottom:5}}>{team.name}</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                {(team.players||[]).map((p,pi)=>{
+                  const pName=typeof p==="object"?p.name:p;
+                  const pId=typeof p==="object"?p.studentId:"";
+                  return(
+                    <span key={pi} style={{fontSize:10,color:`${accent}99`,background:`${accent}08`,border:`1px solid ${accent}15`,padding:"2px 7px",borderRadius:4,display:"inline-flex",gap:4,alignItems:"center"}}>
+                      {pi+1}. {pName}
+                      {pId&&<span style={{fontSize:8,color:`${accent}60`,background:"rgba(0,0,0,0.3)",padding:"0 3px",borderRadius:2}}>{pId}</span>}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Actions */}
+            <div style={{display:"flex",flexDirection:"column",gap:5,flexShrink:0}}>
+              {/* Group buttons */}
+              <div style={{display:"flex",gap:3,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                {showGrps.map(l=>(
+                  <button key={l} className="hbtn"
+                    style={{padding:"3px 9px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",
+                      background:grp===l?`${accent}25`:"transparent",
+                      border:`1px solid ${grp===l?accent:"rgba(0,230,100,0.15)"}`,
+                      color:grp===l?accent:"rgba(0,230,100,0.3)"}}
+                    onClick={()=>setTeamGroups(prev=>({...prev,[team.id]:grp===l?null:l}))}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {/* Attendance + delete */}
+              <div style={{display:"flex",gap:3,justifyContent:"flex-end"}}>
+                <button className="hbtn" style={{padding:"4px 8px",borderRadius:5,fontSize:11,cursor:"pointer",background:team.attendance==="present"?"rgba(16,185,129,0.2)":"transparent",border:`1px solid ${team.attendance==="present"?"rgba(16,185,129,0.4)":"rgba(16,185,129,0.1)"}`,color:team.attendance==="present"?"#10b981":"rgba(16,185,129,0.3)",fontWeight:700}} onClick={()=>markAttendance(team.id,"present")}>✓</button>
+                <button className="hbtn" style={{padding:"4px 8px",borderRadius:5,fontSize:11,cursor:"pointer",background:team.attendance==="absent"?"rgba(239,68,68,0.2)":"transparent",border:`1px solid ${team.attendance==="absent"?"rgba(239,68,68,0.4)":"rgba(239,68,68,0.1)"}`,color:team.attendance==="absent"?"#ef4444":"rgba(239,68,68,0.3)",fontWeight:700}} onClick={()=>markAttendance(team.id,"absent")}>✗</button>
+                <button className="hbtn" style={{padding:"4px 8px",borderRadius:5,fontSize:11,cursor:"pointer",background:"transparent",border:"1px solid rgba(0,230,100,0.08)",color:"rgba(0,230,100,0.25)"}} onClick={()=>removeParticipant(team.id)}>🗑</button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
