@@ -2778,8 +2778,8 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
 // PLAYER SEARCH INPUT — for team registration
 // ═══════════════════════════════════════════════════════════
 function PlayerSearchInput({idx,value,participants,onChange,accent}){
-  const [query,setQuery] = React.useState(value||"");
-  const [showList,setShowList] = React.useState(false);
+  const [query,setQuery] = useState(value||"");
+  const [showList,setShowList] = useState(false);
   const G=accent||"#00e664";
 
   const matches=query.length>=2?participants.filter(p=>
