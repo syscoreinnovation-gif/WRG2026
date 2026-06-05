@@ -2789,16 +2789,7 @@ function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
       cols.slice(catStart).forEach(col=>{const key=col.toLowerCase().trim(),catId=CAT_ALIASES[key];if(catId&&!cats.includes(catId))cats.push(catId);else if(!catId&&col)errs.push(`Row ${i+2}: unknown category "${col}"`);});
       if(!cats.length){errs.push(`Row ${i+2}: "${name}" has no valid categories`);return;}
       // Check for duplicate — merge if same name or same ID
-      const existDup=existingParticipants?.find(p=>
-        p.name.toLowerCase()===name.toLowerCase()||
-        (studentId&&p.studentId&&p.studentId===studentId)
-      );
-      if(existDup){
-        // Flag as merge
-        parsed.push({id:existDup.id,name:existDup.name,studentId:studentId||existDup.studentId,categories:[...new Set([...existDup.categories,...cats])],attendance:existDup.attendance,_merge:true});
-      } else {
-        parsed.push({id:`csv_${Date.now()}_${i}`,name,studentId:studentId||"",categories:cats,attendance:null});
-      }
+      parsed.push({id:`csv_${Date.now()}_${i}`,name,studentId:studentId||"",categories:cats,attendance:null});
     });
     if(errs.length)setError(errs.slice(0,3).join(" · ")+(errs.length>3?` +${errs.length-3} more`:""));
     setPreview(parsed);
