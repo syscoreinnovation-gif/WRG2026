@@ -773,7 +773,7 @@ export default function WRGDashboard(){
   if(syncing) return(
     <div style={{background:"#050e08",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow',sans-serif"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color:"#00e664",letterSpacing:6,opacity:0.3,marginBottom:16}}>WRG 2026 TEST</div>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color:"#00e664",letterSpacing:6,opacity:0.3,marginBottom:16}}>WRG 2026</div>
         <div style={{width:40,height:40,border:"3px solid rgba(0,230,100,0.2)",borderTop:"3px solid #00e664",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/>
         <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
         <div style={{fontSize:12,color:"rgba(0,230,100,0.4)",marginTop:14,letterSpacing:2}}>CONNECTING...</div>
@@ -1721,12 +1721,16 @@ export default function WRGDashboard(){
                       <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>
                         Player Names ({TEAM_CATEGORIES[teamForm.category]?.playerCount} players)
                       </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
                         {teamForm.players.map((player,idx)=>(
-                          <PlayerSearchInput key={idx} idx={idx} value={player.name||player||""} studentId={player.studentId||""}
-                            participants={participants}
-                            onChange={(val,sid)=>updateTeamPlayer(idx,val,sid)}
-                            accent={accent}/>
+                          <div key={idx} style={{position:"relative"}}>
+                            <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{idx+1}</div>
+                            <input
+                              value={typeof player==="object"?player.name:player}
+                              onChange={e=>updateTeamPlayer(idx,e.target.value)}
+                              placeholder={`Player ${idx+1} full name...`}
+                              style={{width:"100%",background:"rgba(0,0,0,0.35)",border:"1px solid rgba(0,230,100,0.15)",borderRadius:7,padding:"9px 12px 9px 28px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
+                          </div>
                         ))}
                       </div>
                     </div>
