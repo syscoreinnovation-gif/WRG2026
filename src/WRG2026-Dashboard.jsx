@@ -709,12 +709,12 @@ export default function WRGDashboard(){
   // ── Team functions ──────────────────────────────────────
   function selectTeamCategory(catId){
     const count=TEAM_CATEGORIES[catId]?.playerCount||2;
-    setTeamForm(f=>({...f,category:catId,players:Array(count).fill(null).map(()=>({name:"",studentId:""}))}));
+    setTeamForm(f=>({...f,category:catId,players:Array(count).fill("")}));
   }
   function addTeam(){
     const{name,category,players}=teamForm;
     if(!name.trim())return;
-    const validPlayers=players.filter(p=>p.name.trim());
+    const validPlayers=players.filter(p=>String(p).trim());
     const team={
       id:`team_${Date.now()}`,
       name:name.trim(),
@@ -726,11 +726,11 @@ export default function WRGDashboard(){
     const updated=[...participants,team];
     setParticipants(updated);
     saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
-    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill(null).map(()=>({name:"",studentId:""}))}));
+    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill("")}));
     showFlash(`✓ Team "${name.trim()}" registered`);
   }
-  function updateTeamPlayer(idx,val,sid=""){
-    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?{name:val,studentId:sid||p.studentId||""}:p)}));
+  function updateTeamPlayer(idx,val){
+    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?val:p)}));
   }
 
   function assignGroup(catId,group,fieldNum){
@@ -1726,7 +1726,7 @@ export default function WRGDashboard(){
                           <div key={idx} style={{position:"relative"}}>
                             <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{idx+1}</div>
                             <input
-                              value={typeof player==="object"?player.name:player}
+                              value={player}
                               onChange={e=>updateTeamPlayer(idx,e.target.value)}
                               placeholder={`Player ${idx+1} full name...`}
                               style={{width:"100%",background:"rgba(0,0,0,0.35)",border:"1px solid rgba(0,230,100,0.15)",borderRadius:7,padding:"9px 12px 9px 28px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
@@ -1759,9 +1759,9 @@ export default function WRGDashboard(){
                           <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee",marginBottom:5}}>{team.name}</div>
                           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                             {(team.players||[]).map((p,pi)=>{
-                              const pName=typeof p==="object"?p.name:p;
-                              const pId=typeof p==="object"?p.studentId:"";
-                              return <span key={pi} style={{fontSize:10,color:`${accent2}99`,background:`${accent2}08`,border:`1px solid ${accent2}15`,padding:"2px 7px",borderRadius:4}}>{pi+1}. {pName}{pId&&` [${pId}]`}</span>;
+                              const pName=typeof p==="object"?(p.name||""):String(p||"");
+                              const pId=typeof p==="object"?(p.studentId||""):"";
+                              return <span key={pi} style={{fontSize:10,color:`${accent2}99`,background:`${accent2}08`,border:`1px solid ${accent2}15`,padding:"2px 7px",borderRadius:4}}>{pi+1}. {pName}{pId&&<span style={{marginLeft:4,fontSize:9,opacity:0.6}}>[{pId}]</span>}</span>;
                             })}
                           </div>
                         </div>
