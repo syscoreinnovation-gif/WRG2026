@@ -709,12 +709,12 @@ export default function WRGDashboard(){
   // ── Team functions ──────────────────────────────────────
   function selectTeamCategory(catId){
     const count=TEAM_CATEGORIES[catId]?.playerCount||2;
-    setTeamForm(f=>({...f,category:catId,players:Array(count).fill("")}));
+    setTeamForm(f=>({...f,category:catId,players:Array(count).fill(null).map(()=>({name:"",studentId:""}))}));
   }
   function addTeam(){
     const{name,category,players}=teamForm;
     if(!name.trim())return;
-    const validPlayers=players.filter(p=>p.trim());
+    const validPlayers=players.filter(p=>p.name.trim());
     const team={
       id:`team_${Date.now()}`,
       name:name.trim(),
@@ -726,11 +726,11 @@ export default function WRGDashboard(){
     const updated=[...participants,team];
     setParticipants(updated);
     saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
-    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill("")}));
+    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill(null).map(()=>({name:"",studentId:""}))}));
     showFlash(`✓ Team "${name.trim()}" registered`);
   }
-  function updateTeamPlayer(idx,val){
-    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?val:p)}));
+  function updateTeamPlayer(idx,val,sid=""){
+    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?{name:val,studentId:sid||p.studentId||""}:p)}));
   }
 
   function assignGroup(catId,group,fieldNum){
@@ -1723,9 +1723,9 @@ export default function WRGDashboard(){
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}}>
                         {teamForm.players.map((player,idx)=>(
-                          <PlayerSearchInput key={idx} idx={idx} value={player}
+                          <PlayerSearchInput key={idx} idx={idx} value={player.name||player||""} studentId={player.studentId||""}
                             participants={participants}
-                            onChange={val=>updateTeamPlayer(idx,val)}
+                            onChange={(val,sid)=>updateTeamPlayer(idx,val,sid)}
                             accent={accent}/>
                         ))}
                       </div>
@@ -1758,11 +1758,13 @@ export default function WRGDashboard(){
                               <div style={{fontWeight:700,fontSize:14,color:"#e8f5ee",marginBottom:6}}>{team.name}</div>
                               {team.players?.length>0&&(
                                 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                                  {team.players.map((p,pi)=>(
-                                    <span key={pi} style={{fontSize:10,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.1)",padding:"2px 8px",borderRadius:4}}>
-                                      {pi+1}. {p}
-                                    </span>
-                                  ))}
+                                  {team.players.map((p,pi)=>{
+                                    const pName=typeof p==="object"?p.name:p;
+                                    const pId=typeof p==="object"?p.studentId:"";
+                                    return(<span key={pi} style={{fontSize:10,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.1)",padding:"2px 8px",borderRadius:4,display:"inline-flex",gap:4,alignItems:"center"}}>
+                                      {pi+1}. {pName}{pId&&<span style={{fontSize:8,color:"rgba(0,230,100,0.4)",background:"rgba(0,0,0,0.3)",padding:"0 4px",borderRadius:2}}>{pId}</span>}
+                                    </span>);
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -2777,7 +2779,7 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
 // ═══════════════════════════════════════════════════════════
 // PLAYER SEARCH INPUT — for team registration
 // ═══════════════════════════════════════════════════════════
-function PlayerSearchInput({idx,value,participants,onChange,accent}){
+function PlayerSearchInput({idx,value,studentId,participants,onChange,accent}){
   const [query,setQuery] = useState(value||"");
   const [showList,setShowList] = useState(false);
   const G=accent||"#00e664";
@@ -2789,7 +2791,7 @@ function PlayerSearchInput({idx,value,participants,onChange,accent}){
 
   function select(p){
     setQuery(p.name);
-    onChange(p.name);
+    onChange(p.name, p.studentId||"");
     setShowList(false);
   }
 
@@ -2797,14 +2799,15 @@ function PlayerSearchInput({idx,value,participants,onChange,accent}){
     <div style={{position:"relative"}}>
       <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1,zIndex:1}}>{idx+1}</div>
       <input value={query}
-        onChange={e=>{setQuery(e.target.value);onChange(e.target.value);setShowList(true);}}
+        onChange={e=>{setQuery(e.target.value);onChange(e.target.value,"");setShowList(true);}}
         onFocus={()=>setShowList(true)}
         onBlur={()=>setTimeout(()=>setShowList(false),150)}
         placeholder={`Player ${idx+1} — type name or ID`}
         style={{width:"100%",background:"rgba(0,0,0,0.35)",
           border:`1px solid ${query?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,
-          borderRadius:7,padding:"9px 12px 9px 28px",
+          borderRadius:7,padding:studentId?"9px 12px 9px 28px":"9px 12px 9px 28px",
           color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
+      {studentId&&<div style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:9,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.08)",border:"1px solid rgba(0,230,100,0.15)",padding:"1px 6px",borderRadius:3,fontWeight:700,pointerEvents:"none"}}>{studentId}</div>}
       {showList&&matches.length>0&&(
         <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:100,
           background:"rgba(5,14,8,0.98)",border:"1px solid rgba(0,230,100,0.2)",
