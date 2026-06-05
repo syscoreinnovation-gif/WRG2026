@@ -2824,9 +2824,10 @@ function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
       <div style={{background:"rgba(0,0,0,0.3)",borderRadius:8,padding:"10px 12px",marginBottom:12,fontSize:11}}>
         <div style={{color:g,fontWeight:700,marginBottom:5,fontSize:10,letterSpacing:1}}>FORMAT — ONE STUDENT PER ROW:</div>
         <div style={{color:"rgba(0,230,100,0.4)",fontFamily:"monospace",lineHeight:1.9,fontSize:11}}>
-          <div style={{color:"rgba(0,230,100,0.25)"}}>Name, Category1, Category2</div>
-          <div>Ahmad Danial, diy-p, sjr</div>
-          <div>Nurul Ain, diy-p, diy-s</div>
+          <div style={{color:"rgba(0,230,100,0.5)",fontFamily:"monospace"}}>Name, StudentID, Category</div>
+          <div style={{fontFamily:"monospace"}}>Ahmad Danial, PNG001, diy-p</div>
+          <div style={{fontFamily:"monospace"}}>Nurul Ain, PNG002, diy-p, diy-s</div>
+          <div style={{fontSize:9,color:"rgba(0,230,100,0.25)",marginTop:4}}>ID is auto-detected · codes: diy-p · diy-s · open2 · soc4 · drone · sia · sir · sja · sjr · ssa · ssr</div>
         </div>
       </div>
       <div style={{display:"flex",gap:8,marginBottom:10}}>
@@ -2835,7 +2836,7 @@ function CsvImport({CATEGORIES,onImport,onReplace,G,S1,BD,BG}){
         ))}
       </div>
       <textarea value={csvText} onChange={e=>{setCsvText(e.target.value);parseCSV(e.target.value);}}
-        placeholder={"Paste CSV data here...\n\nAhmad Danial, diy-p, sjr\nNurul Ain, diy-p, diy-s"}
+        placeholder={"Paste CSV data here...\n\nAhmad Danial, PNG001, diy-p\nNurul Ain, PNG002, diy-p, diy-s"}
         style={{width:"100%",height:140,background:"rgba(0,0,0,0.4)",border:`1px solid ${csvText?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,borderRadius:8,padding:"10px 12px",color:"#e8f5ee",fontFamily:"monospace",fontSize:12,resize:"vertical"}}/>
       {error&&<div style={{fontSize:10,color:"#ef4444",marginTop:6}}>⚠ {error}</div>}
       {preview.length>0&&(
