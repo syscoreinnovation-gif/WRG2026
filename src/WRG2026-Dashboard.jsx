@@ -773,7 +773,7 @@ export default function WRGDashboard(){
   if(syncing) return(
     <div style={{background:"#050e08",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow',sans-serif"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color:"#00e664",letterSpacing:6,opacity:0.3,marginBottom:16}}>WRG 2026</div>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color:"#00e664",letterSpacing:6,opacity:0.3,marginBottom:16}}>WRG 2026 TEST</div>
         <div style={{width:40,height:40,border:"3px solid rgba(0,230,100,0.2)",borderTop:"3px solid #00e664",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto"}}/>
         <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
         <div style={{fontSize:12,color:"rgba(0,230,100,0.4)",marginTop:14,letterSpacing:2}}>CONNECTING...</div>
