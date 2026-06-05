@@ -1721,15 +1721,12 @@ export default function WRGDashboard(){
                       <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>
                         Player Names ({TEAM_CATEGORIES[teamForm.category]?.playerCount} players)
                       </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}}>
                         {teamForm.players.map((player,idx)=>(
-                          <div key={idx} style={{position:"relative"}}>
-                            <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1}}>{idx+1}</div>
-                            <input value={player}
-                              onChange={e=>updateTeamPlayer(idx,e.target.value)}
-                              placeholder={`Player ${idx+1} full name...`}
-                              style={{width:"100%",background:"rgba(0,0,0,0.35)",border:`1px solid ${player?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,borderRadius:7,padding:"9px 12px 9px 28px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
-                          </div>
+                          <PlayerSearchInput key={idx} idx={idx} value={player}
+                            participants={participants}
+                            onChange={val=>updateTeamPlayer(idx,val)}
+                            accent={accent}/>
                         ))}
                       </div>
                     </div>
@@ -2773,6 +2770,66 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
           {allFilled?"⚡ CONFIRM DRAW & GENERATE BRACKET":"Fill all slots to confirm draw"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// PLAYER SEARCH INPUT — for team registration
+// ═══════════════════════════════════════════════════════════
+function PlayerSearchInput({idx,value,participants,onChange,accent}){
+  const [query,setQuery] = React.useState(value||"");
+  const [showList,setShowList] = React.useState(false);
+  const G=accent||"#00e664";
+
+  const matches=query.length>=2?participants.filter(p=>
+    p.name.toLowerCase().includes(query.toLowerCase())||
+    (p.studentId&&p.studentId.toLowerCase().includes(query.toLowerCase()))
+  ).slice(0,6):[];
+
+  function select(p){
+    setQuery(p.name);
+    onChange(p.name);
+    setShowList(false);
+  }
+
+  return(
+    <div style={{position:"relative"}}>
+      <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,fontFamily:"'Bebas Neue'",letterSpacing:1,zIndex:1}}>{idx+1}</div>
+      <input value={query}
+        onChange={e=>{setQuery(e.target.value);onChange(e.target.value);setShowList(true);}}
+        onFocus={()=>setShowList(true)}
+        onBlur={()=>setTimeout(()=>setShowList(false),150)}
+        placeholder={`Player ${idx+1} — type name or ID`}
+        style={{width:"100%",background:"rgba(0,0,0,0.35)",
+          border:`1px solid ${query?"rgba(0,230,100,0.3)":"rgba(0,230,100,0.08)"}`,
+          borderRadius:7,padding:"9px 12px 9px 28px",
+          color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
+      {showList&&matches.length>0&&(
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:100,
+          background:"rgba(5,14,8,0.98)",border:"1px solid rgba(0,230,100,0.2)",
+          borderRadius:8,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.6)",marginTop:2}}>
+          {matches.map(p=>(
+            <div key={p.id}
+              onMouseDown={()=>select(p)}
+              style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid rgba(0,230,100,0.05)",
+                display:"flex",alignItems:"center",gap:8}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(0,230,100,0.06)"}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#e8f5ee",lineHeight:1.2}}>{p.name}</div>
+                <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                  {p.categories.map(cid=>{
+                    const c=[{id:"diy-p",short:"DIY Pri",color:"#00e664"},{id:"diy-s",short:"DIY Sec",color:"#00d4ff"},{id:"sia",short:"Sumo BA",color:"#a78bfa"},{id:"sir",short:"Sumo BR",color:"#fb923c"},{id:"sja",short:"Jr Auto",color:"#34d399"},{id:"sjr",short:"Jr RC",color:"#60a5fa"},{id:"ssa",short:"Sr Auto",color:"#f472b6"},{id:"ssr",short:"Sr RC",color:"#e879f9"}].find(x=>x.id===cid);
+                    return c?<span key={cid} style={{fontSize:8,color:c.color,background:`${c.color}12`,padding:"1px 4px",borderRadius:3,fontWeight:700}}>{c.short}</span>:null;
+                  })}
+                </div>
+              </div>
+              {p.studentId&&<span style={{fontSize:9,color:"rgba(0,230,100,0.5)",background:"rgba(0,230,100,0.06)",border:"1px solid rgba(0,230,100,0.1)",padding:"1px 6px",borderRadius:3,fontWeight:700,flexShrink:0}}>{p.studentId}</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
