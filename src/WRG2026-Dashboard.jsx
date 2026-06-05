@@ -2621,9 +2621,9 @@ function LiveKnockoutBracket({catId,knockoutData,cat,accent,G,S1,onScoreMatch,is
 // ═══════════════════════════════════════════════════════════
 function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw}){
   const cd=catData?.[catId];
-  const [slots,setSlots]=React.useState([]);
-  const [dragging,setDragging]=React.useState(null);
-  const [initialized,setInitialized]=React.useState(false);
+  const [slots,setSlots]=useState([]);
+  const [dragging,setDragging]=useState(null);
+  const [initialized,setInitialized]=useState(false);
 
   // Build qualifiers list from standings
   const standings=cd?calcStandings(cd.groups,cd.matches):{};
@@ -2639,7 +2639,7 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
   let bracketSize=2;while(bracketSize<totalQual)bracketSize*=2;
   const slotCount=bracketSize/2;
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     if(!initialized&&slotCount>0){
       setSlots(Array(slotCount).fill(null));
       setInitialized(true);
