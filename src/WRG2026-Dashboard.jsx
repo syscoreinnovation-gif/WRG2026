@@ -357,6 +357,7 @@ export default function WRGDashboard(){
   const [scoringCat,setScoringCat]   = useState(CATEGORIES[0]?.id||"diy-p");
   const [scoringField,setScoringField] = useState(1);
   const [teamForm,setTeamForm]     = useState({name:"",category:"open2",players:["",""]});
+    const [teamGroups,setTeamGroups] = useState({});
   const [teamTab,setTeamTab]       = useState("list");
   const [syncing,setSyncing]       = useState(true);
   const [playerSearch,setPlayerSearch] = useState("");
