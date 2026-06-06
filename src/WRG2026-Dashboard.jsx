@@ -408,8 +408,8 @@ export default function WRGDashboard(){
   },[]);
 
   const isGenerated=!!data;
-  const cat=CATEGORIES.find(c=>c.id===activeCat);
-  const accent=cat.color;
+  const cat=CATEGORIES.find(c=>c.id===activeCat)||CATEGORIES[0];
+    const accent=cat?.color||"#00e664";
   const fieldCfg=FIELD_CONFIG[activeCat];
   const catData=data?.[activeCat]||{groups:{},matches:[]};
   const catMatches=catData.matches||[];
