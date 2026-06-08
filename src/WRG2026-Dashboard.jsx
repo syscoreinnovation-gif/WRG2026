@@ -27,6 +27,15 @@ const DIY_SIDES = {
   }
 };
 
+// DIY: force an exact number of groups PER AREA so qualifiers land on a power of two.
+// diy-p: 8 groups/area -> 16 groups -> 32 qualifiers -> Round of 32
+// diy-s: 4 groups/area ->  8 groups -> 16 qualifiers -> Round of 16
+const DIY_GROUPS_PER_AREA = { "diy-p": 8, "diy-s": 4 };
+// Where the two areas first meet in the knockout:
+//  "crossFirstRound"  -> every first knockout match is Area1 vs Area2 (Primary)
+//  "separateUntilQF"  -> each area plays its own first round; areas first meet at the QF (Secondary)
+const DIY_KNOCKOUT_MODE = { "diy-p": "crossFirstRound", "diy-s": "separateUntilQF" };
+
 const FIELD_CONFIG = {
   "diy-p":  { count:8, label:"FIELD",  color:"#00e664" },
   "diy-s":  { count:2, label:"FIELD",  color:"#00d4ff" },
@@ -61,6 +70,13 @@ function calcGroupSizes(n){
   if(n<=0)return[];
   const g=Math.ceil(n/6),b=Math.floor(n/g),e=n%g;
   return Array.from({length:g},(_,i)=>b+(i<e?1:0));
+}
+// Force members into exactly `n` groups, distributed as evenly as possible (round-robin deal).
+function splitIntoNGroups(members,n){
+  const count=Math.max(1,n);
+  const groups=Array.from({length:count},()=>[]);
+  members.forEach((m,i)=>{groups[i%count].push(m);});
+  return groups.filter(g=>g.length);
 }
 // ── Berger table round-robin scheduling ─────────────────────
 // Generates rounds where NO player appears twice in the same round
@@ -141,29 +157,30 @@ function generateTournament(participants,groupFieldMaps,manualGroups,diyAreas){
     }
 
     // ── DIY Soccer area split ──────────────────────────────
-    if(DIY_CATS_LOCAL.includes(cat.id)&&diyAreas&&diyAreas[cat.id]){
-      const areaMap=diyAreas[cat.id];
+    // Two areas, a FIXED number of groups per area (so qualifiers = power of two),
+    // each group tagged with its area (1/2) and within-area index for cross-seeding.
+    if(DIY_CATS_LOCAL.includes(cat.id)){
+      const areaMap=(diyAreas&&diyAreas[cat.id])||{};
       const area1=present.filter(p=>areaMap[p.id]==="1");
       const area2=present.filter(p=>areaMap[p.id]==="2");
-      const unassigned=present.filter(p=>!areaMap[p.id]);
-      // Merge unassigned into whichever area is smaller
-      unassigned.forEach((p,i)=>{if(i%2===0)area1.push(p);else area2.push(p);});
+      const unassigned=present.filter(p=>areaMap[p.id]!=="1"&&areaMap[p.id]!=="2");
+      // If no manual area assignment, auto-split present players evenly across the two areas
+      unassigned.forEach((p,i)=>{(i%2===0?area1:area2).push(p);});
       const fc=FIELD_CONFIG[cat.id].count;
       const halfFields=Math.floor(fc/2);
       const area1Fields=Array.from({length:halfFields},(_,i)=>i+1);
       const area2Fields=Array.from({length:fc-halfFields},(_,i)=>i+halfFields+1);
+      const groupsPerArea=DIY_GROUPS_PER_AREA[cat.id]||Math.max(1,Math.ceil(Math.max(area1.length,area2.length)/6));
       const groups={};const fieldGroupRounds={};
-      const processArea=(members,fields)=>{
-        if(!members.length)return;
-        const sizes=calcGroupSizes(members.length);
-        let idx=0;
-        sizes.forEach((size,gi)=>{
-          const letter=L[gi+(groups?Object.keys(groups).length:0)];
-          const aMembers=members.slice(idx,idx+size);idx+=size;
-          groups[letter]=aMembers.map(p=>({id:p.id,name:p.name,group:letter,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
-          const field=fields[gi%fields.length];
+      let letterIdx=0;
+      const processArea=(members,fields,areaNum)=>{
+        const buckets=splitIntoNGroups(members,groupsPerArea);
+        buckets.forEach((bMembers,gi)=>{
+          const letter=L[letterIdx++];
+          groups[letter]=bMembers.map(p=>({id:p.id,name:p.name,group:letter,area:areaNum,areaIdx:gi,side:areaNum===1?"A":"B",P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0}));
+          const field=fields.length?fields[gi%fields.length]:1;
           if(!fieldGroupRounds[field])fieldGroupRounds[field]={};
-          fieldGroupRounds[field][letter]=genRRRounds(aMembers).map((round,ri)=>
+          fieldGroupRounds[field][letter]=genRRRounds(bMembers).map((round,ri)=>
             round.map((pair,mi)=>({
               id:`${cat.id}-${letter}-${ri}-${mi}`,catId:cat.id,group:letter,
               p1:pair[0].id,p2:pair[1].id,p1name:pair[0].name,p2name:pair[1].name,
@@ -172,22 +189,22 @@ function generateTournament(participants,groupFieldMaps,manualGroups,diyAreas){
           );
         });
       };
-      processArea(area1,area1Fields);
-      processArea(area2,area2Fields);
+      processArea(area1,area1Fields,1);
+      processArea(area2,area2Fields,2);
       const interleavedMatches=[];
       Object.keys(fieldGroupRounds).sort((a,b)=>Number(a)-Number(b)).forEach(field=>{
         const groupLabels=Object.keys(fieldGroupRounds[field]);
         const allGroupRounds=fieldGroupRounds[field];
-        const maxRounds=Math.max(...groupLabels.map(g=>allGroupRounds[g].length));
+        const maxRounds=groupLabels.length?Math.max(...groupLabels.map(g=>allGroupRounds[g].length)):0;
         for(let ri=0;ri<maxRounds;ri++){
           const roundPerGroup=groupLabels.map(g=>allGroupRounds[g][ri]||[]);
-          const maxMatchesInRound=Math.max(...roundPerGroup.map(m=>m.length));
+          const maxMatchesInRound=roundPerGroup.length?Math.max(...roundPerGroup.map(m=>m.length)):0;
           for(let mi=0;mi<maxMatchesInRound;mi++){
             roundPerGroup.forEach(gm=>{if(gm[mi])interleavedMatches.push(gm[mi]);});
           }
         }
       });
-      catData[cat.id]={groups,matches:interleavedMatches};
+      catData[cat.id]={groups,matches:interleavedMatches,diyArea:true,groupsPerArea};
       return;
     }
 
@@ -252,11 +269,101 @@ function getRoundName(matchCount){
   if(matchCount===2)return"Semi Finals";
   return"Final";
 }
+// ── DIY knockout shared helpers ──────────────────────────
+// Pull each group's winner/runner-up out of standings, indexed by area + within-area index.
+// Returns A[area][areaIdx] = { W:{id,name,seed}, RU:{id,name,seed} }.
+function diyAreaQualifiers(standings){
+  const A={1:[],2:[]};
+  const seedOf=(p,rank)=>p?{id:p.id,name:p.name,seed:`${rank}${p.group}`}:null;
+  Object.keys(standings).forEach(letter=>{
+    const arr=standings[letter]||[];
+    if(!arr.length)return;
+    const area=arr[0].area, idx=arr[0].areaIdx;
+    if((area!==1&&area!==2)||idx==null)return;
+    A[area][idx]={W:seedOf(arr[0],1),RU:seedOf(arr[1],2)};
+  });
+  return A;
+}
+// Build one first-round match object (handles byes when a slot is empty).
+function mkKOMatch(catId,idx,p1,p2){
+  let status="pending",winnerId=null,winnerName=null,winnerSeed=null,score1=null,score2=null;
+  if(p1&&!p2){status="bye";winnerId=p1.id;winnerName=p1.name;winnerSeed=p1.seed;score1=1;score2=0;}
+  else if(!p1&&p2){status="bye";winnerId=p2.id;winnerName=p2.name;winnerSeed=p2.seed;score1=0;score2=1;}
+  else if(!p1&&!p2){status="bye";}
+  return{id:`ko-${catId}-0-${idx}`,p1:p1||null,p2:p2||null,score1,score2,status,winnerId,winnerName,winnerSeed};
+}
+// Given an ordered first round, pad to a power of two and build all later rounds
+// (standard advancement: match 2k and 2k+1 feed next-round match k).
+function finishBracketFromR1(catId,r1){
+  let bracketSize=1;while(bracketSize<r1.length*2)bracketSize*=2;
+  while(r1.length<bracketSize/2){
+    r1.push({id:`ko-${catId}-0-${r1.length}`,p1:null,p2:null,score1:null,score2:null,status:"bye",winnerId:null,winnerName:null,winnerSeed:null});
+  }
+  const rounds=[r1];let prev=r1;
+  while(prev.length>1){
+    const next=Array.from({length:Math.ceil(prev.length/2)},(_,i)=>({
+      id:`ko-${catId}-${rounds.length}-${i}`,p1:null,p2:null,
+      score1:null,score2:null,status:"waiting",winnerId:null,winnerName:null,winnerSeed:null
+    }));
+    prev.forEach((m,mi)=>{
+      if((m.status==="bye"||m.status==="completed")&&m.winnerId){
+        const ni=Math.floor(mi/2),slot=mi%2===0?"p1":"p2";
+        next[ni][slot]={id:m.winnerId,name:m.winnerName,seed:m.winnerSeed};
+        if(next[ni].p1&&next[ni].p2)next[ni].status="pending";
+      }
+    });
+    rounds.push(next);prev=next;
+  }
+  return{bracketSize,rounds};
+}
+// MODE A — cross at the FIRST knockout round (Primary).
+// Every first-round match is Area1 vs Area2; each group's winner & runner-up land in
+// opposite halves, so group-mates can only meet again in the Final.
+function generateDIYBracket(catId,cd,standings){
+  const gpa=cd.groupsPerArea||0;
+  if(gpa<1)return null;
+  const A=diyAreaQualifiers(standings);
+  const r1=[];
+  for(let i=0;i<gpa;i++){r1.push(mkKOMatch(catId,r1.length,A[1][i]&&A[1][i].W,A[2][i]&&A[2][i].RU));} // top half
+  for(let i=0;i<gpa;i++){r1.push(mkKOMatch(catId,r1.length,A[2][i]&&A[2][i].W,A[1][i]&&A[1][i].RU));} // bottom half
+  const{bracketSize,rounds}=finishBracketFromR1(catId,r1);
+  return{bracketSize,rounds,generated:true,diy:true,mode:"crossFirstRound"};
+}
+// MODE B — areas SEPARATE in the first round, cross at the QF (Secondary).
+// Each area plays its own within-area first round (group winner vs another group's
+// runner-up). The two areas' winners are then interleaved so the QF pairs an Area1
+// survivor against an Area2 survivor. Group-mates still land in opposite halves.
+function generateDIYBracketSeparateQF(catId,cd,standings){
+  const n=cd.groupsPerArea||0;
+  if(n<1)return null;
+  const A=diyAreaQualifiers(standings);
+  const half=Math.floor(n/2)||1;
+  const areaMatch=(area,i)=>{
+    const w=A[area][i]&&A[area][i].W;
+    const ru=A[area][(i+half)%n]&&A[area][(i+half)%n].RU;
+    return mkKOMatch(catId,0,w,ru); // idx fixed up below
+  };
+  const r1=[];
+  for(let i=0;i<n;i++){
+    const a1=areaMatch(1,i),a2=areaMatch(2,i);
+    a1.id=`ko-${catId}-0-${r1.length}`;r1.push(a1); // Area 1 within-area match i
+    a2.id=`ko-${catId}-0-${r1.length}`;r1.push(a2); // Area 2 within-area match i
+  }
+  const{bracketSize,rounds}=finishBracketFromR1(catId,r1);
+  return{bracketSize,rounds,generated:true,diy:true,mode:"separateUntilQF"};
+}
 function generateKnockoutBracket(catId,catData){
   const cd=catData[catId];
   if(!cd?.matches?.length)return null;
   if(!cd.matches.every(m=>m.status==="completed"))return null;
   const standings=calcStandings(cd.groups,cd.matches);
+  // DIY: cross-seed Area 1 vs Area 2 (group winners vs other-area runners-up)
+  if(cd.diyArea){
+    const mode=DIY_KNOCKOUT_MODE[catId]||"crossFirstRound";
+    return mode==="separateUntilQF"
+      ? generateDIYBracketSeparateQF(catId,cd,standings)
+      : generateDIYBracket(catId,cd,standings);
+  }
   const groups=Object.keys(standings).sort();
   if(groups.length<2)return null;
   const totalQual=groups.length*2;
