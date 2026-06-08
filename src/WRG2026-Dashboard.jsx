@@ -35,6 +35,9 @@ const DIY_GROUPS_PER_AREA = { "diy-p": 8, "diy-s": 4 };
 //  "crossFirstRound"  -> every first knockout match is Area1 vs Area2 (Primary)
 //  "separateUntilQF"  -> each area plays its own first round; areas first meet at the QF (Secondary)
 const DIY_KNOCKOUT_MODE = { "diy-p": "crossFirstRound", "diy-s": "separateUntilQF" };
+// Minimum number of groups for these categories (auto-grouping floor) so the
+// knockout has enough qualifiers to draw a fuller bracket. Others use the ~6-per-group default.
+const MIN_GROUPS = { "open2":4, "drone":4, "sia":4, "sir":4, "sja":4, "sjr":4, "ssa":4, "ssr":4 };
 
 const FIELD_CONFIG = {
   "diy-p":  { count:8, label:"FIELD",  color:"#00e664" },
@@ -78,6 +81,17 @@ function splitIntoNGroups(members,n){
   members.forEach((m,i)=>{groups[i%count].push(m);});
   return groups.filter(g=>g.length);
 }
+// Group sizes for a category, applying its MIN_GROUPS floor (capped at the player count).
+function calcGroupSizesFor(catId,n){
+  if(n<=0)return[];
+  const base=calcGroupSizes(n).length;                 // default ~6-per-group count
+  const g=Math.min(n,Math.max(base,MIN_GROUPS[catId]||0));
+  const b=Math.floor(n/g),e=n%g;
+  return Array.from({length:g},(_,i)=>b+(i<e?1:0));
+}
+// Normalize a Student ID for matching: uppercase + strip all whitespace.
+// So "PNG 001", "png001", and "PNG  001" all compare as the same student. Empty stays empty.
+function normId(s){return (s||"").toString().toUpperCase().replace(/\s+/g,"");}
 // ── Berger table round-robin scheduling ─────────────────────
 // Generates rounds where NO player appears twice in the same round
 // Players get maximum rest between matches
@@ -209,7 +223,7 @@ function generateTournament(participants,groupFieldMaps,manualGroups,diyAreas){
     }
 
     // ── Default auto-generate ──────────────────────────────
-    const sizes=calcGroupSizes(present.length),groups={};
+    const sizes=calcGroupSizesFor(cat.id,present.length),groups={};
     let idx=0;
     const fieldGroupRounds={}; // {field: {groupLabel: [[match,...], [match,...], ...]}}
     sizes.forEach((size,gi)=>{
@@ -727,23 +741,24 @@ export default function WRGDashboard(){
   function lockView(){setAuth(a=>({...a,[view]:false}));setJudgeField(null);setJudgeCategory(null);setView("public");}
   function addParticipant(){
     if(!addForm.name.trim()||!addForm.cats.length)return;
-    // Duplicate check by name or ID
-    const nameLower=addForm.name.trim().toLowerCase();
-    const dup=participants.find(p=>
-      p.name.toLowerCase()===nameLower||
-      (addForm.studentId&&p.studentId&&p.studentId===addForm.studentId)
-    );
+    const nameTrim=addForm.name.trim();
+    const nid=normId(addForm.studentId);
+    // Merge ONLY when Student IDs match (same student entered for another category).
+    // Never merge on name — two different students can share a name.
+    const dup=nid?participants.find(p=>normId(p.studentId)===nid):null;
     if(dup){
-      // Merge categories instead of adding duplicate
       const merged=[...new Set([...dup.categories,...addForm.cats])];
+      const nameClash=dup.name.trim().toLowerCase()!==nameTrim.toLowerCase();
       const updated=participants.map(p=>p.id===dup.id?{...p,categories:merged,studentId:addForm.studentId||dup.studentId}:p);
       setParticipants(updated);
       saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
       setAddForm({name:"",cats:[],studentId:"",side:""});
-      showFlash(`↗ Merged categories into existing "${dup.name}"`);
+      showFlash(nameClash
+        ? `⚠ ID ${addForm.studentId} already belongs to "${dup.name}" — merged categories (name kept). Check for an ID typo.`
+        : `↗ Merged categories into existing "${dup.name}"`);
       return;
     }
-    const newP={id:`p${Date.now()}`,name:addForm.name.trim(),studentId:addForm.studentId||"",side:addForm.side||"",categories:addForm.cats,attendance:null};
+    const newP={id:`p${Date.now()}`,name:nameTrim,studentId:addForm.studentId||"",side:addForm.side||"",categories:addForm.cats,attendance:null};
     const updated=[...participants,newP];
     setParticipants(updated);
     saveState({participants:updated,groupFieldMaps,tournamentData:data});
@@ -1608,17 +1623,16 @@ export default function WRGDashboard(){
                   {/* CSV Import */}
                   <CsvImport CATEGORIES={CATEGORIES}
                     onImport={(p)=>{
-                      let merged=0,added=0;
+                      let merged=0,added=0,conflicts=0;
                       const result=[...participants];
                       p.forEach(newP=>{
-                        // Find existing by same ID or same name
-                        const existIdx=result.findIndex(ex=>
-                          (newP.studentId&&ex.studentId&&ex.studentId===newP.studentId)||
-                          ex.name.toLowerCase().trim()===newP.name.toLowerCase().trim()
-                        );
+                        const nid=normId(newP.studentId);
+                        // Merge ONLY on matching Student ID. Rows without an ID are never
+                        // auto-merged (two students can share a name), so they add separately.
+                        const existIdx=nid?result.findIndex(ex=>normId(ex.studentId)===nid):-1;
                         if(existIdx>=0){
-                          // Merge categories
                           const ex=result[existIdx];
+                          if(ex.name.toLowerCase().trim()!==newP.name.toLowerCase().trim())conflicts++;
                           result[existIdx]={...ex,
                             categories:[...new Set([...ex.categories,...newP.categories])],
                             studentId:ex.studentId||newP.studentId||""
@@ -1631,7 +1645,7 @@ export default function WRGDashboard(){
                       });
                       setParticipants(result);
                       saveState({participants:result,groupFieldMaps,tournamentData:data,knockoutData});
-                      showFlash(`✓ ${added} added · ${merged} merged`);
+                      showFlash(`✓ ${added} added · ${merged} merged${conflicts?` · ⚠ ${conflicts} same-ID/different-name — check for typos`:""}`);
                     }}
                     onReplace={(p)=>{
                       setParticipants(p);
@@ -2171,7 +2185,7 @@ export default function WRGDashboard(){
                           const fc=FIELD_CONFIG[c.id];
                           const pres=participants.filter(p=>p.categories.includes(c.id)&&p.attendance==="present").length;
                           if(pres===0)return null;
-                          const sizes=calcGroupSizes(pres),L="ABCDEFGHIJKLMNOPQRSTUVWXYZ",groups=sizes.map((_,i)=>L[i]);
+                          const sizes=calcGroupSizesFor(c.id,pres),L="ABCDEFGHIJKLMNOPQRSTUVWXYZ",groups=sizes.map((_,i)=>L[i]);
                           const fmap=getGroupFieldMap(c.id,groups,fc.count);
                           const fieldLoad={};for(let f=1;f<=fc.count;f++)fieldLoad[f]=groups.filter(g=>fmap[g]===f).length;
                           const maxLoad=Math.max(...Object.values(fieldLoad)),minLoad=Math.min(...Object.values(fieldLoad));
