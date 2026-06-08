@@ -2542,7 +2542,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
                 <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:col,letterSpacing:3,marginBottom:10,borderLeft:`3px solid ${col}`,paddingLeft:10}}>
                   AREA {ar} <span style={{fontSize:11,opacity:0.5}}>· {fields.length} {selFc.label.toLowerCase()}s</span>
                 </div>
-                <div className="judge-field-grid" style={{display:"grid",gap:14}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14}}>
                   {fields.map(renderFieldCard)}
                 </div>
               </div>
@@ -2550,7 +2550,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           })}
         </div>
       ):(
-        <div className="judge-field-grid" style={{display:"grid",gap:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14}}>
           {Array.from({length:selFc.count},(_,i)=>i+1).map(renderFieldCard)}
         </div>
       )}
