@@ -474,6 +474,7 @@ export default function WRGDashboard(){
   const [scoreCat,setScoreCat]           = useState(null);
   const [scoreField,setScoreField]       = useState(null);
   const [koScoreModal,setKoScoreModal] = useState(null);
+  const [drawModal,setDrawModal]       = useState(null); // catId of category whose manual knockout draw is open
   const [koScoreInput,setKoScoreInput] = useState({s1:"",s2:""});
 
   // ── Save to Firebase ─────────────────────────────────────
@@ -661,37 +662,17 @@ export default function WRGDashboard(){
   }
 
   function confirmManualDraw(catId, slots){
-    // Build bracket from manual slot assignment
-    const rounds=[];
-    const r1=slots.map((slot,idx)=>({
-      id:`ko-${catId}-0-${idx}`,
-      p1:slot?{id:slot.id,name:slot.name,seed:slot.seed}:null,
-      p2:null,score1:null,score2:null,status:"pending",
-      winnerId:null,winnerName:null,winnerSeed:null
-    }));
-    // Pair slots: slot 0 vs slot 1, slot 2 vs slot 3, etc.
-    const r1Paired=[];
-    for(let i=0;i<r1.length;i+=2){
-      r1Paired.push({
-        id:`ko-${catId}-0-${i/2}`,
-        p1:r1[i]?.p1||null,
-        p2:r1[i+1]?.p1||null,
-        score1:null,score2:null,status:"pending",
-        winnerId:null,winnerName:null,winnerSeed:null
-      });
+    // slots: one player ({id,name,seed}) or null per bracket position, length = bracketSize.
+    // Pair adjacent positions (0v1, 2v3, ...) into first-round matches; an empty side = bye.
+    const r1=[];
+    for(let i=0;i<slots.length;i+=2){
+      r1.push(mkKOMatch(catId,r1.length,slots[i]||null,slots[i+1]||null));
     }
-    rounds.push(r1Paired);
-    let prev=r1Paired;
-    while(prev.length>1){
-      const next=Array.from({length:Math.ceil(prev.length/2)},(_,i)=>({
-        id:`ko-${catId}-${rounds.length}-${i}`,p1:null,p2:null,
-        score1:null,score2:null,status:"waiting",winnerId:null,winnerName:null,winnerSeed:null
-      }));
-      rounds.push(next);prev=next;
-    }
-    const updated={...knockoutData,[catId]:{bracketSize:slots.length,rounds,generated:true,manualDraw:true}};
+    const{bracketSize,rounds}=finishBracketFromR1(catId,r1);
+    const updated={...knockoutData,[catId]:{bracketSize,rounds,generated:true,manualDraw:true}};
     setKnockoutData(updated);
     saveState({participants,groupFieldMaps,tournamentData:data,knockoutData:updated});
+    setDrawModal(null);
     showFlash("🏆 Bracket confirmed!");
   }
 
@@ -2271,11 +2252,11 @@ export default function WRGDashboard(){
                                 koGenerated?(
                                   <div style={{fontSize:9,color:"#ffd700",fontWeight:700,background:"rgba(255,215,0,0.08)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:5,padding:"4px 8px",textAlign:"center"}}>🏆 KNOCKOUT READY</div>
                                 ):(
-                                  <button className="hbtn" onClick={()=>triggerGenerateKnockout(c.id)}
+                                  <button className="hbtn" onClick={()=>allDone&&setDrawModal(c.id)}
                                     style={{width:"100%",padding:"6px",background:allDone?`${c.color}20`:"rgba(0,230,100,0.05)",
                                       border:`1px solid ${allDone?c.color+"50":"rgba(0,230,100,0.15)"}`,
-                                      borderRadius:5,color:allDone?c.color:"rgba(0,230,100,0.35)",fontWeight:700,fontSize:10,cursor:"pointer"}}>
-                                    {allDone?"⚡ GENERATE KNOCKOUT":"⚡ GENERATE KNOCKOUT (Group stage incomplete)"}
+                                      borderRadius:5,color:allDone?c.color:"rgba(0,230,100,0.35)",fontWeight:700,fontSize:10,cursor:allDone?"pointer":"not-allowed"}}>
+                                    {allDone?"🎯 SET UP KNOCKOUT DRAW":"🎯 KNOCKOUT DRAW (Group stage incomplete)"}
                                   </button>
                                 )
                               )}
@@ -2303,6 +2284,25 @@ export default function WRGDashboard(){
           onConfirm={()=>updateKnockoutScore(koScoreModal.catId,koScoreModal.roundIdx,koScoreModal.matchIdx)}
         />
       )}
+
+      {/* MANUAL KNOCKOUT DRAW MODAL */}
+      {drawModal&&(()=>{
+        const dc=CATEGORIES.find(c=>c.id===drawModal);
+        return(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.94)",backdropFilter:"blur(12px)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:500,padding:"24px 16px",overflowY:"auto"}}
+            onClick={e=>e.target===e.currentTarget&&setDrawModal(null)}>
+            <div style={{background:"rgba(5,14,8,0.98)",border:`2px solid ${(dc?.color||G)}40`,borderRadius:18,padding:"22px 20px",width:"100%",maxWidth:1100,margin:"auto"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6,gap:10,flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:2,color:dc?.color||G}}>{dc?.icon} {dc?.name} — KNOCKOUT DRAW</div>
+                <button onClick={()=>setDrawModal(null)} style={{fontSize:13,color:"rgba(232,245,238,0.5)",background:"none",border:"1px solid rgba(0,230,100,0.15)",borderRadius:7,padding:"5px 12px",cursor:"pointer",fontWeight:700}}>✕ CLOSE</button>
+              </div>
+              <div style={{fontSize:11,color:"rgba(0,230,100,0.4)",marginBottom:16}}>Drag every qualifier into a match slot — you choose who plays whom. Leave a slot empty for a bye. Confirm to lock the bracket.</div>
+              <ManualBracketDraw key={drawModal} catId={drawModal} catData={data} knockoutData={knockoutData}
+                accent={dc?.color||G} G={G} S1={S1} onConfirmDraw={(slots)=>confirmManualDraw(drawModal,slots)}/>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* PIN MODAL */}
       {pinModal.open&&(
@@ -2781,8 +2781,9 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
   });
 
   const totalQual=qualifiers.length;
-  let bracketSize=2;while(bracketSize<totalQual)bracketSize*=2;
-  const slotCount=bracketSize/2;
+  let bracketSize=2;while(bracketSize<totalQual)bracketSize*=2; // number of bracket positions
+  const slotCount=bracketSize;     // one slot per position; any left empty becomes a bye
+  const numMatches=bracketSize/2;  // first-round matches
 
   useEffect(()=>{
     if(!initialized&&slotCount>0){
@@ -2814,7 +2815,9 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
 
   function clearSlot(idx){setSlots(s=>s.map((v,i)=>i===idx?null:v));}
 
-  const allFilled=slots.length>0&&slots.every(Boolean);
+  // Ready once every qualifier is seated; any remaining empty positions become byes.
+  const seated=slots.filter(Boolean).length;
+  const ready=totalQual>0&&available.length===0&&seated===totalQual;
 
   if(!cd?.matches?.length)return<div style={{textAlign:"center",padding:40,color:"rgba(0,230,100,0.3)"}}>No tournament data yet.</div>;
 
@@ -2850,42 +2853,48 @@ function ManualBracketDraw({catId,catData,knockoutData,accent,G,S1,onConfirmDraw
         })}
       </div>
 
-      {/* Bracket Slots */}
-      <div style={{flex:1,minWidth:220}}>
-        <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5,marginBottom:10}}>
-          BRACKET DRAW — Round of {bracketSize} ({slotCount} matches)
+      {/* Bracket — match cards */}
+      <div style={{flex:1,minWidth:240}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+          <div style={{fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700,letterSpacing:1.5}}>BRACKET DRAW — ROUND OF {bracketSize}</div>
+          <div style={{fontSize:9,color:"rgba(0,230,100,0.3)"}}>{numMatches} matches · {available.length} left to place</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginBottom:16}}>
-          {slots.map((slot,idx)=>(
-            <div key={idx}
-              onDragOver={e=>e.preventDefault()}
-              onDrop={()=>handleDrop(idx)}
-              style={{borderRadius:10,border:`2px dashed ${slot?accent+"50":"rgba(0,230,100,0.15)"}`,
-                background:slot?`${accent}08`:"rgba(0,0,0,0.2)",
-                minHeight:72,transition:"all .2s",position:"relative",overflow:"hidden"}}>
-              <div style={{position:"absolute",top:5,left:8,fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700}}>SLOT {idx+1}</div>
-              {slot?(
-                <div style={{padding:"18px 10px 8px"}}>
-                  <div style={{fontSize:9,color:accent,fontWeight:700,marginBottom:2}}>{slot.seed}</div>
-                  <div style={{fontWeight:700,fontSize:12,color:"#e8f5ee",wordBreak:"break-word",lineHeight:1.3,cursor:"grab"}}
-                    draggable onDragStart={()=>handleSlotDragStart(idx)}>{slot.name}</div>
-                  <button onClick={()=>clearSlot(idx)} style={{marginTop:4,fontSize:9,color:"rgba(239,68,68,0.5)",background:"none",border:"none",cursor:"pointer",padding:0}}>✕ remove</button>
-                </div>
-              ):(
-                <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:72,color:"rgba(0,230,100,0.2)",fontSize:11}}>
-                  Drop here
-                </div>
-              )}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:10,marginBottom:16}}>
+          {Array.from({length:numMatches},(_,m)=>(
+            <div key={m} style={{border:`1px solid ${accent}22`,borderRadius:10,background:"rgba(0,0,0,0.15)",padding:8}}>
+              <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:6}}>MATCH {m+1}</div>
+              {[m*2,m*2+1].map((idx,k)=>{
+                const slot=slots[idx];
+                return(
+                  <div key={idx}>
+                    <div onDragOver={e=>e.preventDefault()} onDrop={()=>handleDrop(idx)}
+                      style={{borderRadius:8,border:`2px dashed ${slot?accent+"50":"rgba(0,230,100,0.15)"}`,
+                        background:slot?`${accent}10`:"rgba(0,0,0,0.25)",minHeight:46,
+                        display:"flex",alignItems:"center",padding:"6px 8px",position:"relative"}}>
+                      {slot?(
+                        <div style={{width:"100%",cursor:"grab"}} draggable onDragStart={()=>handleSlotDragStart(idx)}>
+                          <div style={{fontSize:9,color:accent,fontWeight:700}}>{slot.seed}</div>
+                          <div style={{fontWeight:700,fontSize:12,color:"#e8f5ee",wordBreak:"break-word",lineHeight:1.25}}>{slot.name}</div>
+                          <button onClick={()=>clearSlot(idx)} style={{position:"absolute",top:4,right:6,fontSize:11,color:"rgba(239,68,68,0.55)",background:"none",border:"none",cursor:"pointer",padding:0}}>✕</button>
+                        </div>
+                      ):(
+                        <div style={{color:"rgba(0,230,100,0.25)",fontSize:10}}>Drop player — or leave empty (bye)</div>
+                      )}
+                    </div>
+                    {k===0&&<div style={{textAlign:"center",fontSize:9,color:"rgba(0,230,100,0.3)",fontWeight:700,padding:"3px 0"}}>vs</div>}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
         <button
-          style={{padding:"10px 24px",background:allFilled?`linear-gradient(135deg,${accent},#009944)`:"rgba(0,0,0,0.3)",
-            border:allFilled?"none":"1px solid rgba(0,230,100,0.1)",borderRadius:8,
-            color:allFilled?"#050e08":"rgba(0,230,100,0.25)",fontWeight:700,fontSize:13,
-            cursor:allFilled?"pointer":"not-allowed",boxShadow:allFilled?`0 4px 18px ${accent}35`:"none"}}
-          onClick={()=>allFilled&&onConfirmDraw(slots)}>
-          {allFilled?"⚡ CONFIRM DRAW & GENERATE BRACKET":"Fill all slots to confirm draw"}
+          style={{padding:"10px 24px",background:ready?`linear-gradient(135deg,${accent},#009944)`:"rgba(0,0,0,0.3)",
+            border:ready?"none":"1px solid rgba(0,230,100,0.1)",borderRadius:8,
+            color:ready?"#050e08":"rgba(0,230,100,0.25)",fontWeight:700,fontSize:13,
+            cursor:ready?"pointer":"not-allowed",boxShadow:ready?`0 4px 18px ${accent}35`:"none"}}
+          onClick={()=>ready&&onConfirmDraw(slots)}>
+          {ready?"⚡ CONFIRM DRAW & GENERATE BRACKET":`Place all ${totalQual} qualifiers to confirm`}
         </button>
       </div>
     </div>
