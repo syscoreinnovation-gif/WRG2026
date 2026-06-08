@@ -1928,7 +1928,7 @@ export default function WRGDashboard(){
                           </div>
                         </div>
                       </div>
-                      <AdminScoringView data={data} scoringCat={scoringCat} scoringField={scoringField} setScoringField={setScoringField} FIELD_CONFIG={FIELD_CONFIG} holdMatch={holdMatch} releaseMatch={releaseMatch} openScoreModal={openScoreModal}/>
+                      <AdminScoringView data={data} scoringCat={scoringCat} scoringField={scoringField} setScoringField={setScoringField} FIELD_CONFIG={FIELD_CONFIG} participants={participants} holdMatch={holdMatch} releaseMatch={releaseMatch} openScoreModal={openScoreModal}/>
                     </div>
                   )}
                 </div>
@@ -2463,6 +2463,64 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
   const selCat=CATEGORIES.find(c=>c.id===judgeCategory);
   const selFc=FIELD_CONFIG[judgeCategory];
   const col=selCat.color;
+  // DIY categories split fields across two areas (lower half = Area 1, upper half = Area 2)
+  const DIY_AREA=["diy-p","diy-s"].includes(judgeCategory);
+  const halfFields=Math.floor(selFc.count/2)||1;
+  const areaOf=(f)=>DIY_AREA?(f<=halfFields?1:2):null;
+  // Student ID lookup by participant id
+  const sidBy={};participants.forEach(p=>{sidBy[p.id]=p.studentId||"";});
+  // Player name with Student ID underneath
+  const plName=(pid,name,align,colr)=>(
+    <div style={{textAlign:align||"left",minWidth:0}}>
+      <div style={{fontWeight:700,fontSize:"clamp(13px,1.5vw,16px)",color:colr||"#e8f5ee",lineHeight:1.25,wordBreak:"break-word"}}>{name}</div>
+      {sidBy[pid]?<div style={{fontSize:10,fontWeight:700,color:`${col}bb`,letterSpacing:0.5,marginTop:1}}>{sidBy[pid]}</div>:null}
+    </div>
+  );
+  // One field card for the selector — number, area, groups, counts, and the next 10 matches
+  const renderFieldCard=(num)=>{
+    const catMap=groupFieldMaps[judgeCategory]||{};
+    const cdx=tournamentData[judgeCategory];
+    const assignedGroups=Object.entries(catMap).filter(([g,f])=>Number(f)===num).map(([g])=>g);
+    const fPending=(cdx?.matches||[]).filter(m=>m.field===num&&m.status==="pending");
+    const heldCount=(cdx?.matches||[]).filter(m=>m.field===num&&m.status==="held").length;
+    const ar=areaOf(num);
+    const up=fPending.slice(0,10);
+    return(
+      <div key={num} style={{background:S1,border:`2px solid ${col}25`,borderRadius:14,padding:"16px 16px",cursor:"pointer",transition:"all .2s"}}
+        onMouseEnter={e=>{e.currentTarget.style.borderColor=col+"60";e.currentTarget.style.background=`${col}0a`;}}
+        onMouseLeave={e=>{e.currentTarget.style.borderColor=`${col}25`;e.currentTarget.style.background=S1;}}
+        onClick={()=>selectJudgeField(selFc.label,num)}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(34px,5vw,52px)",color:col,letterSpacing:1,lineHeight:1,textShadow:`0 0 18px ${col}40`}}>{num}</div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontFamily:"'Bebas Neue'",fontSize:12,color:col,letterSpacing:2,opacity:0.7}}>{selFc.label}</div>
+            {ar&&<div style={{fontSize:9,fontWeight:700,color:col,background:`${col}18`,border:`1px solid ${col}30`,padding:"1px 7px",borderRadius:4,marginTop:3,letterSpacing:1}}>AREA {ar}</div>}
+          </div>
+        </div>
+        {assignedGroups.length>0&&(
+          <div style={{margin:"8px 0 0"}}>
+            {assignedGroups.map(g=><span key={g} style={{display:"inline-block",fontSize:9,background:`${col}18`,color:col,border:`1px solid ${col}25`,padding:"2px 7px",borderRadius:4,fontWeight:700,margin:"2px 2px 0 0"}}>GRP {g}</span>)}
+          </div>
+        )}
+        <div style={{display:"flex",gap:4,flexWrap:"wrap",margin:"8px 0"}}>
+          {fPending.length>0&&<span style={{fontSize:9,background:`${col}18`,color:col,padding:"2px 8px",borderRadius:8,fontWeight:700}}>{fPending.length} pending</span>}
+          {heldCount>0&&<span style={{fontSize:9,background:"rgba(245,158,11,0.15)",color:"#f59e0b",padding:"2px 8px",borderRadius:8,fontWeight:700}}>⏸ {heldCount}</span>}
+          {fPending.length===0&&heldCount===0&&<span style={{fontSize:9,color:"#10b981",fontWeight:700}}>✓ Clear</span>}
+        </div>
+        {up.length>0&&(
+          <div style={{borderTop:`1px solid ${col}15`,paddingTop:8}}>
+            <div style={{fontSize:8,color:`${col}99`,fontWeight:700,letterSpacing:1.5,marginBottom:5}}>NEXT {up.length} UP</div>
+            {up.map((m,i)=>(
+              <div key={m.id} style={{fontSize:10,color:"rgba(232,245,238,0.72)",lineHeight:1.55,display:"flex",gap:5,wordBreak:"break-word",marginBottom:2}}>
+                <span style={{color:`${col}88`,fontWeight:700,flexShrink:0}}>{i+1}.</span>
+                <span><span style={{fontWeight:600}}>{m.p1name}</span>{sidBy[m.p1]?<span style={{color:`${col}aa`,fontWeight:700}}> {sidBy[m.p1]}</span>:""} <span style={{color:`${col}77`}}>vs</span> <span style={{fontWeight:600}}>{m.p2name}</span>{sidBy[m.p2]?<span style={{color:`${col}aa`,fontWeight:700}}> {sidBy[m.p2]}</span>:""}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // STEP 2: SELECT FIELD
   if(!judgeField)return(
@@ -2474,34 +2532,28 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           <div style={{fontSize:11,color:"rgba(0,230,100,0.35)"}}>Select your {selFc.label.toLowerCase()}</div>
         </div>
       </div>
-      <div className="judge-field-grid" style={{display:"grid",gap:14}}>
-        {Array.from({length:selFc.count},(_,i)=>i+1).map(num=>{
-          const catMap=groupFieldMaps[judgeCategory]||{};
-          const cd=tournamentData[judgeCategory];
-          const assignedGroups=Object.entries(catMap).filter(([g,f])=>Number(f)===num).map(([g])=>g);
-          const pendCount=(cd?.matches||[]).filter(m=>m.field===num&&m.status==="pending").length;
-          const heldCount=(cd?.matches||[]).filter(m=>m.field===num&&m.status==="held").length;
-          return(
-            <div key={num} style={{background:S1,border:`2px solid ${col}25`,borderRadius:14,padding:"22px 20px",cursor:"pointer",transition:"all .2s",textAlign:"center"}}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor=col+"60";e.currentTarget.style.background=`${col}0a`;}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=`${col}25`;e.currentTarget.style.background=S1;}}
-              onClick={()=>selectJudgeField(selFc.label,num)}>
-              <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(48px,7vw,72px)",color:col,letterSpacing:2,lineHeight:1,textShadow:`0 0 20px ${col}40`}}>{num}</div>
-              <div style={{fontFamily:"'Bebas Neue'",fontSize:13,color:col,letterSpacing:3,marginBottom:12,opacity:0.7}}>{selFc.label}</div>
-              {assignedGroups.length>0&&(
-                <div style={{marginBottom:10}}>
-                  {assignedGroups.map(g=><span key={g} style={{display:"inline-block",fontSize:9,background:`${col}18`,color:col,border:`1px solid ${col}25`,padding:"2px 7px",borderRadius:4,fontWeight:700,margin:"2px"}}>{g}</span>)}
+      {DIY_AREA?(
+        <div>
+          {[1,2].map(ar=>{
+            const fields=Array.from({length:selFc.count},(_,i)=>i+1).filter(n=>areaOf(n)===ar);
+            if(!fields.length)return null;
+            return(
+              <div key={ar} style={{marginBottom:22}}>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:col,letterSpacing:3,marginBottom:10,borderLeft:`3px solid ${col}`,paddingLeft:10}}>
+                  AREA {ar} <span style={{fontSize:11,opacity:0.5}}>· {fields.length} {selFc.label.toLowerCase()}s</span>
                 </div>
-              )}
-              <div style={{display:"flex",gap:4,justifyContent:"center",flexWrap:"wrap"}}>
-                {pendCount>0&&<span style={{fontSize:9,background:`${col}18`,color:col,padding:"2px 8px",borderRadius:8,fontWeight:700}}>{pendCount} pending</span>}
-                {heldCount>0&&<span style={{fontSize:9,background:"rgba(245,158,11,0.15)",color:"#f59e0b",padding:"2px 8px",borderRadius:8,fontWeight:700}}>⏸ {heldCount}</span>}
-                {pendCount===0&&heldCount===0&&<span style={{fontSize:9,color:"#10b981",fontWeight:700}}>✓ Clear</span>}
+                <div className="judge-field-grid" style={{display:"grid",gap:14}}>
+                  {fields.map(renderFieldCard)}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ):(
+        <div className="judge-field-grid" style={{display:"grid",gap:14}}>
+          {Array.from({length:selFc.count},(_,i)=>i+1).map(renderFieldCard)}
+        </div>
+      )}
     </div>
   );
 
@@ -2519,7 +2571,7 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
       <div style={{background:`linear-gradient(135deg,${col}14,transparent)`,border:`1px solid ${col}30`,borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
         <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(40px,6vw,56px)",color:col,letterSpacing:2,lineHeight:1,textShadow:`0 0 20px ${col}40`}}>{fieldNum}</div>
         <div style={{flex:1}}>
-          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(14px,2vw,20px)",color:col,letterSpacing:2}}>{selFc.label} {fieldNum} — {selCat.icon} {selCat.name}</div>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(14px,2vw,20px)",color:col,letterSpacing:2}}>{selFc.label} {fieldNum}{areaOf(fieldNum)?` · AREA ${areaOf(fieldNum)}`:""} — {selCat.icon} {selCat.name}</div>
           <div style={{fontSize:11,color:"rgba(0,230,100,0.35)",marginTop:2}}>{fieldPending.length} pending · {fieldHeld.length} held · {fieldDone.length} done</div>
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
@@ -2547,11 +2599,11 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
                 </div>
                 <div className="match-card-inner" style={{display:"flex",alignItems:"center",gap:12}}>
                   <div style={{flex:1,minWidth:80}}>
-                    <div style={{fontWeight:700,fontSize:"clamp(13px,1.5vw,16px)",color:fieldBusy.has(m.p1)?"#f59e0b":"#e8f5ee"}}>{m.p1name}</div>
+                    {plName(m.p1,m.p1name,"left",fieldBusy.has(m.p1)?"#f59e0b":"#e8f5ee")}
                   </div>
                   <div style={{background:"rgba(0,230,100,0.08)",border:"1px solid rgba(0,230,100,0.15)",borderRadius:8,padding:"6px 12px",fontFamily:"'Bebas Neue'",fontSize:16,color:"rgba(0,230,100,0.5)",letterSpacing:3}}>VS</div>
-                  <div style={{flex:1,minWidth:80,textAlign:"right"}}>
-                    <div style={{fontWeight:700,fontSize:"clamp(13px,1.5vw,16px)",color:fieldBusy.has(m.p2)?"#f59e0b":"#e8f5ee"}}>{m.p2name}</div>
+                  <div style={{flex:1,minWidth:80}}>
+                    {plName(m.p2,m.p2name,"right",fieldBusy.has(m.p2)?"#f59e0b":"#e8f5ee")}
                   </div>
                   <div className="match-actions" style={{display:"flex",gap:8,flexShrink:0}}>
                     <button style={{padding:"8px 12px",background:"rgba(245,158,11,0.1)",border:"1px solid rgba(245,158,11,0.3)",borderRadius:7,color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>holdMatch(m.id)}>⏸ HOLD</button>
@@ -3099,14 +3151,18 @@ function TeamsPublicView({participants,activeCat,accent,TEAM_CATEGORIES}){
 // ═══════════════════════════════════════════════════════════
 // ADMIN SCORING VIEW
 // ═══════════════════════════════════════════════════════════
-function AdminScoringView({data,scoringCat,scoringField,setScoringField,FIELD_CONFIG,holdMatch,releaseMatch,openScoreModal}){
+function AdminScoringView({data,scoringCat,scoringField,setScoringField,FIELD_CONFIG,participants,holdMatch,releaseMatch,openScoreModal}){
   const fieldCfg=FIELD_CONFIG[scoringCat];
   const catM=(data[scoringCat]?.matches)||[];
   const fieldMatches=catM.filter(m=>m.field===scoringField);
   const pending=fieldMatches.filter(m=>m.status==="pending");
   const held=fieldMatches.filter(m=>m.status==="held");
-  const queue=[...pending,...held].slice(0,8);
+  const queue=[...pending,...held].slice(0,12);
   const accent2=fieldCfg?.color||"#00e664";
+  const DIY_AREA=["diy-p","diy-s"].includes(scoringCat);
+  const halfFields=Math.floor((fieldCfg?.count||1)/2)||1;
+  const areaOf=(f)=>DIY_AREA?(f<=halfFields?1:2):null;
+  const sidBy={};(participants||[]).forEach(p=>{sidBy[p.id]=p.studentId||"";});
   return(
     <div>
       {/* Field selector */}
@@ -3118,7 +3174,7 @@ function AdminScoringView({data,scoringCat,scoringField,setScoringField,FIELD_CO
               border:`1px solid ${scoringField===f?accent2+"50":"rgba(0,230,100,0.1)"}`,
               color:scoringField===f?accent2:"rgba(0,230,100,0.4)"}}
             onClick={()=>setScoringField(f)}>
-            {fieldCfg?.label||"Field"} {f}
+            {fieldCfg?.label||"Field"} {f}{areaOf(f)?` · A${areaOf(f)}`:""}
           </button>
         ))}
       </div>
@@ -3127,11 +3183,14 @@ function AdminScoringView({data,scoringCat,scoringField,setScoringField,FIELD_CO
         <div style={{textAlign:"center",padding:30,color:"rgba(0,230,100,0.3)",fontSize:13}}>No pending matches on this field</div>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {areaOf(scoringField)&&<div style={{fontSize:10,fontWeight:700,letterSpacing:2,color:accent2,marginBottom:2}}>AREA {areaOf(scoringField)} · {fieldCfg?.label} {scoringField}</div>}
           {queue.map(m=>(
             <div key={m.id} style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${accent2}15`,borderRadius:8,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:11,color:"rgba(0,230,100,0.4)",marginBottom:4}}>Group {m.group} · {m.status==="held"?"⏸ HELD":"⏳ PENDING"}</div>
-                <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee"}}>{m.p1name} <span style={{color:accent2}}>vs</span> {m.p2name}</div>
+                <div style={{fontWeight:700,fontSize:13,color:"#e8f5ee"}}>
+                  {m.p1name}{sidBy[m.p1]?<span style={{fontSize:10,color:`${accent2}bb`,fontWeight:700}}> {sidBy[m.p1]}</span>:""} <span style={{color:accent2}}>vs</span> {m.p2name}{sidBy[m.p2]?<span style={{fontSize:10,color:`${accent2}bb`,fontWeight:700}}> {sidBy[m.p2]}</span>:""}
+                </div>
               </div>
               <div style={{display:"flex",gap:6}}>
                 {m.status==="pending"&&<button className="hbtn" style={{padding:"5px 10px",background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:6,color:"#fbbf24",fontSize:10,fontWeight:700,cursor:"pointer"}} onClick={()=>holdMatch(m.id)}>⏸ HOLD</button>}
