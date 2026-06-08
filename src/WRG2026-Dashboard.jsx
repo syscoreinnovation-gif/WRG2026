@@ -1934,36 +1934,6 @@ export default function WRGDashboard(){
                 </div>
               )}
 
-                            {adminTab==="score"&&(
-                <div className="fadein">
-                  {!isGenerated?(
-                    <div style={{textAlign:"center",padding:"40px 20px",color:"rgba(0,230,100,0.25)",fontSize:13}}>
-                      <div style={{fontSize:40,marginBottom:12}}>🎯</div>
-                      <div>Generate the tournament first to start scoring.</div>
-                    </div>
-                  ):(
-                    <JudgePanel
-                      isGenerated={isGenerated}
-                      judgeCategory={scoreCat}
-                      judgeField={scoreField}
-                      CATEGORIES={CATEGORIES}
-                      FIELD_CONFIG={FIELD_CONFIG}
-                      tournamentData={data}
-                      groupFieldMaps={groupFieldMaps}
-                      participants={participants}
-                      selectJudgeCategory={cat=>{setScoreCat(cat);setScoreField(null);}}
-                      selectJudgeField={setScoreField}
-                      changeJudgeCategory={()=>{setScoreCat(null);setScoreField(null);}}
-                      setJudgeField={setScoreField}
-                      holdMatch={(catId,matchId)=>holdMatch(catId,matchId)}
-                      releaseMatch={(catId,matchId)=>releaseMatch(catId,matchId)}
-                      openScoreModal={openScoreModal}
-                      G={G} S1={S1} BD={BD} BG={BG}
-                    />
-                  )}
-                </div>
-              )}
-
               {adminTab==="generate"&&(
                 <div>
                   {/* ── GROUP SETUP SECTION ── */}
