@@ -35,22 +35,35 @@ const DIY_GROUPS_PER_AREA = { "diy-p": 8, "diy-s": 4 };
 //  "crossFirstRound"  -> every first knockout match is Area1 vs Area2 (Primary)
 //  "separateUntilQF"  -> each area plays its own first round; areas first meet at the QF (Secondary)
 const DIY_KNOCKOUT_MODE = { "diy-p": "crossFirstRound", "diy-s": "separateUntilQF" };
-// Minimum number of groups for these categories (auto-grouping floor) so the
-// knockout has enough qualifiers to draw a fuller bracket. Others use the ~6-per-group default.
-const MIN_GROUPS = { "open2":4, "drone":4, "sia":4, "sir":4, "sja":4, "sjr":4, "ssa":4, "ssr":4 };
+// Minimum number of groups for these categories (auto-grouping floor).
+// open2: 4 groups/field × 2 fields = 8 total  |  soc4: 2/field × 2 = 4  |  drone: 4 on 1 arena
+// sumo: 4 groups split across their ring count (basic=2 rings, junior/senior=1 ring)
+const MIN_GROUPS = { "open2":8, "soc4":4, "drone":4, "sia":4, "sir":4, "sja":4, "sjr":4, "ssa":4, "ssr":4 };
 
 const FIELD_CONFIG = {
-  "diy-p":  { count:8, label:"FIELD",  color:"#00e664" },
-  "diy-s":  { count:2, label:"FIELD",  color:"#00d4ff" },
-  "open2":  { count:2, label:"FIELD",  color:"#ff6b35" },
-  "soc4":   { count:1, label:"FIELD",  color:"#ffd700" },
-  "drone":  { count:1, label:"ARENA",  color:"#ff4d8d" },
-  "sia":    { count:4, label:"RING",   color:"#a78bfa" },
-  "sir":    { count:4, label:"RING",   color:"#fb923c" },
-  "sja":    { count:4, label:"RING",   color:"#34d399" },
-  "sjr":    { count:4, label:"RING",   color:"#60a5fa" },
-  "ssa":    { count:4, label:"RING",   color:"#f472b6" },
-  "ssr":    { count:4, label:"RING",   color:"#e879f9" },
+  "diy-p":  { count:8, label:"FIELD",  color:"#00e664" },  // Area1: 4 fields, Area2: 4 fields
+  "diy-s":  { count:2, label:"FIELD",  color:"#00d4ff" },  // Area1: 1 field,  Area2: 1 field
+  "open2":  { count:2, label:"FIELD",  color:"#ff6b35" },  // 2 fields × 4 groups each = 8 groups
+  "soc4":   { count:2, label:"FIELD",  color:"#ffd700" },  // 2 fields × 2 groups each = 4 groups
+  "drone":  { count:1, label:"ARENA",  color:"#ff4d8d" },  // 1 arena × 4 groups
+  "sia":    { count:2, label:"DOHYO",  color:"#a78bfa" },  // 2 dohyo × 2 groups = 4 groups
+  "sir":    { count:2, label:"DOHYO",  color:"#fb923c" },  // 2 dohyo × 2 groups = 4 groups
+  "sja":    { count:1, label:"DOHYO",  color:"#34d399" },  // 1 dohyo × 4 groups
+  "sjr":    { count:1, label:"DOHYO",  color:"#60a5fa" },  // 1 dohyo × 4 groups
+  "ssa":    { count:1, label:"DOHYO",  color:"#f472b6" },  // 1 dohyo × 4 groups
+  "ssr":    { count:1, label:"DOHYO",  color:"#e879f9" },  // 1 dohyo × 4 groups
+};
+
+// Main judge names — shown in field selector and scoring views
+const JUDGE_NAMES = {
+  "diy-p":  { area1:"Mr Sathish", area2:"Mr Param" },
+  "diy-s":  { area1:"Mr Sathish", area2:"Mr Param" },
+  "open2":  "Mr Tamil",
+  "soc4":   "Mr Tamil",
+  "drone":  "Mr Tamil",
+  "sia":    "Mr Tamil", "sir":"Mr Tamil",
+  "sja":    "Mr Tamil", "sjr":"Mr Tamil",
+  "ssa":    "Mr Tamil", "ssr":"Mr Tamil",
 };
 
 const CATEGORIES = [
@@ -2525,7 +2538,8 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
           <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(34px,5vw,52px)",color:col,letterSpacing:1,lineHeight:1,textShadow:`0 0 18px ${col}40`}}>{num}</div>
           <div style={{textAlign:"right"}}>
             <div style={{fontFamily:"'Bebas Neue'",fontSize:12,color:col,letterSpacing:2,opacity:0.7}}>{selFc.label}</div>
-            {ar&&<div style={{fontSize:9,fontWeight:700,color:col,background:`${col}18`,border:`1px solid ${col}30`,padding:"1px 7px",borderRadius:4,marginTop:3,letterSpacing:1}}>AREA {ar}</div>}
+            {ar&&<div style={{fontSize:9,fontWeight:700,color:col,background:`${col}18`,border:`1px solid ${col}30`,padding:"1px 7px",borderRadius:4,marginTop:3,letterSpacing:1}}>AREA {ar}{JUDGE_NAMES[judgeCategory]?.[`area${ar}`]?` · ${JUDGE_NAMES[judgeCategory][`area${ar}`]}`:""}</div>}
+            {!ar&&JUDGE_NAMES[judgeCategory]&&typeof JUDGE_NAMES[judgeCategory]==="string"&&<div style={{fontSize:9,fontWeight:700,color:col,opacity:0.6,marginTop:3}}>{JUDGE_NAMES[judgeCategory]}</div>}
           </div>
         </div>
         {assignedGroups.length>0&&(
@@ -2571,7 +2585,9 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
             return(
               <div key={ar} style={{marginBottom:22}}>
                 <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:col,letterSpacing:3,marginBottom:10,borderLeft:`3px solid ${col}`,paddingLeft:10}}>
-                  AREA {ar} <span style={{fontSize:11,opacity:0.5}}>· {fields.length} {selFc.label.toLowerCase()}s</span>
+                  AREA {ar}
+                  {JUDGE_NAMES[judgeCategory]?.[`area${ar}`]&&<span style={{fontFamily:"'Barlow',sans-serif",fontSize:12,fontWeight:700,opacity:0.7,letterSpacing:1,marginLeft:8}}>· {JUDGE_NAMES[judgeCategory][`area${ar}`]}</span>}
+                  <span style={{fontSize:11,opacity:0.5,marginLeft:8}}>· {fields.length} {selFc.label.toLowerCase()}s</span>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14}}>
                   {fields.map(renderFieldCard)}
@@ -2602,7 +2618,10 @@ function JudgePanel({isGenerated,judgeCategory,judgeField,CATEGORIES,FIELD_CONFI
       <div style={{background:`linear-gradient(135deg,${col}14,transparent)`,border:`1px solid ${col}30`,borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
         <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(40px,6vw,56px)",color:col,letterSpacing:2,lineHeight:1,textShadow:`0 0 20px ${col}40`}}>{fieldNum}</div>
         <div style={{flex:1}}>
-          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(14px,2vw,20px)",color:col,letterSpacing:2}}>{selFc.label} {fieldNum}{areaOf(fieldNum)?` · AREA ${areaOf(fieldNum)}`:""} — {selCat.icon} {selCat.name}</div>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(14px,2vw,20px)",color:col,letterSpacing:2}}>
+            {selFc.label} {fieldNum}{areaOf(fieldNum)?` · AREA ${areaOf(fieldNum)}${JUDGE_NAMES[judgeCategory]?.[`area${areaOf(fieldNum)}`]?` (${JUDGE_NAMES[judgeCategory][`area${areaOf(fieldNum)}`]})`:""}`:""} — {selCat.icon} {selCat.name}
+            {!DIY_AREA&&JUDGE_NAMES[judgeCategory]&&typeof JUDGE_NAMES[judgeCategory]==="string"&&<span style={{fontSize:12,fontWeight:400,opacity:0.6,marginLeft:8}}>· {JUDGE_NAMES[judgeCategory]}</span>}
+          </div>
           <div style={{fontSize:11,color:"rgba(0,230,100,0.35)",marginTop:2}}>{fieldPending.length} pending · {fieldHeld.length} held · {fieldDone.length} done</div>
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
