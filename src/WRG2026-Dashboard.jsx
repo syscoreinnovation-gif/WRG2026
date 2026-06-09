@@ -18,12 +18,12 @@ const TEAM_CATEGORIES = {
 // DIY Soccer sides config
 const DIY_SIDES = {
   "diy-p": {
-    A:{ label:"Sathish Anne", fields:[1,2,3,4] },
-    B:{ label:"Param Sir",    fields:[5,6,7,8] }
+    A:{ label:"MR SATHISH", fields:[1,2,3,4] },
+    B:{ label:"MR PARAM",    fields:[5,6,7,8] }
   },
   "diy-s": {
-    A:{ label:"Sathish Anne", fields:[1] },
-    B:{ label:"Param Sir",    fields:[2] }
+    A:{ label:"MR SATHISH", fields:[1] },
+    B:{ label:"MR PARAM",    fields:[2] }
   }
 };
 
