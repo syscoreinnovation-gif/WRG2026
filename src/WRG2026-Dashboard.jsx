@@ -477,7 +477,7 @@ export default function WRGDashboard(){
   const [sidebarOpen,setSidebarOpen] = useState(false);
   const [scoringCat,setScoringCat]   = useState(CATEGORIES[0]?.id||"diy-p");
   const [scoringField,setScoringField] = useState(1);
-  const [teamForm,setTeamForm]     = useState({name:"",category:"open2",players:["",""]});
+  const [teamForm,setTeamForm]     = useState({name:"",category:"open2",players:[{name:"",studentId:""},{name:"",studentId:""}]});
     const [teamGroups,setTeamGroups] = useState({});
   const [teamTab,setTeamTab]       = useState("list");
   const [syncing,setSyncing]       = useState(true);
@@ -814,12 +814,12 @@ export default function WRGDashboard(){
   // ── Team functions ──────────────────────────────────────
   function selectTeamCategory(catId){
     const count=TEAM_CATEGORIES[catId]?.playerCount||2;
-    setTeamForm(f=>({...f,category:catId,players:Array(count).fill("")}));
+    setTeamForm(f=>({...f,category:catId,players:Array.from({length:count},()=>({name:"",studentId:""}))}));
   }
   function addTeam(){
     const{name,category,players}=teamForm;
     if(!name.trim())return;
-    const validPlayers=players.filter(p=>String(p).trim());
+    const validPlayers=players.filter(p=>(typeof p==="object"?p.name:String(p||"")).trim());
     const team={
       id:`team_${Date.now()}`,
       name:name.trim(),
@@ -831,11 +831,12 @@ export default function WRGDashboard(){
     const updated=[...participants,team];
     setParticipants(updated);
     saveState({participants:updated,groupFieldMaps,tournamentData:data,knockoutData});
-    setTeamForm(f=>({...f,name:"",players:Array(TEAM_CATEGORIES[f.category]?.playerCount||2).fill("")}));
+    const nextCount=TEAM_CATEGORIES[category]?.playerCount||2;
+    setTeamForm(f=>({...f,name:"",players:Array.from({length:nextCount},()=>({name:"",studentId:""}))}));
     showFlash(`✓ Team "${name.trim()}" registered`);
   }
-  function updateTeamPlayer(idx,val){
-    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?val:p)}));
+  function updateTeamPlayer(idx,playerName,playerStudentId){
+    setTeamForm(f=>({...f,players:f.players.map((p,i)=>i===idx?{name:playerName,studentId:playerStudentId||""}:p)}));
   }
 
   function assignGroup(catId,group,fieldNum){
@@ -1820,21 +1821,22 @@ export default function WRGDashboard(){
                         style={{width:"100%",background:"rgba(0,0,0,0.4)",border:`1px solid ${teamForm.name?"rgba(0,230,100,0.4)":"rgba(0,230,100,0.1)"}`,borderRadius:8,padding:"10px 14px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:13,fontWeight:500}}/>
                     </div>
 
-                    {/* Player names */}
+                    {/* Player names — search from imported participants */}
                     <div style={{marginBottom:16}}>
                       <div style={{fontSize:9,color:"rgba(0,230,100,0.35)",fontWeight:700,letterSpacing:1,marginBottom:8,textTransform:"uppercase"}}>
-                        Player Names ({TEAM_CATEGORIES[teamForm.category]?.playerCount} players)
+                        Player Names ({TEAM_CATEGORIES[teamForm.category]?.playerCount} players) — type name or Student ID to search
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:8}}>
                         {teamForm.players.map((player,idx)=>(
-                          <div key={idx} style={{position:"relative"}}>
-                            <div style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"rgba(0,230,100,0.4)",fontWeight:700}}>{idx+1}</div>
-                            <input
-                              value={player}
-                              onChange={e=>updateTeamPlayer(idx,e.target.value)}
-                              placeholder={`Player ${idx+1} full name...`}
-                              style={{width:"100%",background:"rgba(0,0,0,0.35)",border:"1px solid rgba(0,230,100,0.15)",borderRadius:7,padding:"9px 12px 9px 28px",color:"#e8f5ee",fontFamily:"'Barlow',sans-serif",fontSize:12}}/>
-                          </div>
+                          <PlayerSearchInput
+                            key={idx}
+                            idx={idx}
+                            value={typeof player==="object"?player.name:player}
+                            studentId={typeof player==="object"?player.studentId:""}
+                            participants={participants.filter(p=>!p.isTeam)}
+                            onChange={(name,sid)=>updateTeamPlayer(idx,name,sid)}
+                            accent={CATEGORIES.find(c=>c.id===teamForm.category)?.color||"#00e664"}
+                          />
                         ))}
                       </div>
                     </div>
