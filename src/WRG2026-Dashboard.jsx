@@ -1227,7 +1227,16 @@ export default function WRGDashboard(){
                   <div style={{background:`linear-gradient(135deg,${accent}15,transparent)`,border:`1px solid ${accent}25`,borderRadius:14,padding:"14px 18px",marginBottom:18}}>
                     <div className="hero-bar" style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
                       <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(20px,3vw,36px)",color:accent,letterSpacing:3,lineHeight:1,textShadow:`0 0 20px ${accent}50`}}>{cat.icon} {cat.name}</div>
-                      {isGenerated&&<div style={{fontSize:9,color:accent,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>{fieldCfg.count} {fieldCfg.label}{fieldCfg.count>1?"S":""}</div>}
+                      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                        {JUDGE_NAMES[activeCat]&&(
+                          <div style={{fontSize:9,color:accent,background:`${accent}12`,border:`1px solid ${accent}25`,padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:0.5}}>
+                            👤 {typeof JUDGE_NAMES[activeCat]==="string"
+                              ? `Main Judge: ${JUDGE_NAMES[activeCat]}`
+                              : `Area 1: ${JUDGE_NAMES[activeCat].area1} · Area 2: ${JUDGE_NAMES[activeCat].area2}`}
+                          </div>
+                        )}
+                        {isGenerated&&<div style={{fontSize:9,color:accent,background:`${accent}15`,border:`1px solid ${accent}25`,padding:"3px 10px",borderRadius:20,fontWeight:700,letterSpacing:1}}>{fieldCfg.count} {fieldCfg.label}{fieldCfg.count>1?"S":""}</div>}
+                      </div>
                     </div>
                     <div className="stat-grid">
                       {[["PENDING",pending.length,"#94a3b8"],["DONE",completed.length,"#10b981"],["ON HOLD",held.length,held.length>0?"#f59e0b":"#4a7a5a"],[`${fieldCfg.label}S`,fieldCfg.count,accent]].map(([l,v,c])=>(
@@ -1370,97 +1379,145 @@ export default function WRGDashboard(){
 
 
                   {/* FIXTURES */}
-
-                  {pubTab==="fixtures"&&Object.keys(catData.groups||{}).sort()
-                    .filter(g=>{
-                      if(!DIY_SIDES[activeCat])return true;
-                      const m=catData.matches?.find(mm=>mm.group===g);
-                      if(!m)return true;
-                      return(DIY_SIDES[activeCat][activeSide]?.fields||[]).includes(m.field);
-                    }).map(g=>{
-                    const gm=catMatches.filter(m=>m.group===g);
-                    return(
-                      <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
-                        <div style={{background:`linear-gradient(90deg,${accent}14,transparent)`,padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",alignItems:"center",gap:10}}>
-                          <div style={{width:26,height:26,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:15,color:"#050e08"}}>{g}</div>
-                          <span style={{fontWeight:700,fontSize:13,letterSpacing:0.5}}>GROUP {g}</span>
-                          <span style={{marginLeft:"auto",fontSize:10,color:"rgba(0,230,100,0.35)"}}>{gm.filter(m=>m.status==="completed").length}/{gm.length} played</span>
-                        </div>
-                        {gm.map(m=>(
-                          <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:10,background:m.status==="held"?"rgba(245,158,11,0.03)":"transparent"}}>
-                            <div className="player-name player-name-md name-clamp2" style={{flex:1,textAlign:"right",color:"#e8f5ee"}}>{m.p1name}</div>
-                            <div style={{width:84,textAlign:"center"}}>
-                              {m.status==="completed"?(
-                                <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4}}>
-                                  <span style={{color:m.score1>m.score2?accent:m.score1===m.score2?"#ffd700":"rgba(232,245,238,0.25)"}}>{m.score1}</span>
-                                  <span style={{color:"rgba(0,230,100,0.2)",margin:"0 2px"}}>–</span>
-                                  <span style={{color:m.score2>m.score1?accent:m.score1===m.score2?"#ffd700":"rgba(232,245,238,0.25)"}}>{m.score2}</span>
-                                </div>
-                              ):m.status==="held"?(
-                                <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.12)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>⏸</span>
-                              ):(
-                                <span style={{fontSize:9,color:"rgba(0,230,100,0.25)",background:"rgba(0,230,100,0.05)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>PENDING</span>
-                              )}
-                            </div>
-                            <div className="player-name player-name-md name-clamp2" style={{flex:1,color:"#e8f5ee"}}>{m.p2name}</div>
+                  {pubTab==="fixtures"&&(()=>{
+                    const allGrps=Object.keys(catData.groups||{}).sort();
+                    const isDIY=!!DIY_SIDES[activeCat];
+                    const groupField=g=>groupFieldMaps[activeCat]?.[g]||catData.matches?.find(m=>m.group===g)?.field;
+                    const renderGroup=g=>{
+                      const gm=catMatches.filter(m=>m.group===g);
+                      const fNum=groupField(g);
+                      return(
+                        <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
+                          <div style={{background:`linear-gradient(90deg,${accent}14,transparent)`,padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                            <div style={{width:26,height:26,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:15,color:"#050e08"}}>{g}</div>
+                            <span style={{fontWeight:700,fontSize:13,letterSpacing:0.5}}>GROUP {g}</span>
+                            {fNum&&<span style={{fontSize:9,fontWeight:700,color:accent,background:`${accent}12`,border:`1px solid ${accent}25`,padding:"2px 8px",borderRadius:4}}>{fieldCfg.label} {fNum}</span>}
+                            <span style={{marginLeft:"auto",fontSize:10,color:"rgba(0,230,100,0.35)"}}>{gm.filter(m=>m.status==="completed").length}/{gm.length} played</span>
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })}
+                          {gm.map(m=>(
+                            <div key={m.id} className="mrow" style={{display:"flex",alignItems:"center",padding:"9px 16px",borderBottom:"1px solid rgba(0,230,100,0.03)",gap:10,background:m.status==="held"?"rgba(245,158,11,0.03)":"transparent"}}>
+                              <div className="player-name player-name-md name-clamp2" style={{flex:1,textAlign:"right",color:"#e8f5ee"}}>{m.p1name}</div>
+                              <div style={{width:84,textAlign:"center"}}>
+                                {m.status==="completed"?(
+                                  <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,26px)",letterSpacing:4}}>
+                                    <span style={{color:m.score1>m.score2?accent:m.score1===m.score2?"#ffd700":"rgba(232,245,238,0.25)"}}>{m.score1}</span>
+                                    <span style={{color:"rgba(0,230,100,0.2)",margin:"0 2px"}}>–</span>
+                                    <span style={{color:m.score2>m.score1?accent:m.score1===m.score2?"#ffd700":"rgba(232,245,238,0.25)"}}>{m.score2}</span>
+                                  </div>
+                                ):m.status==="held"?(
+                                  <span style={{fontSize:9,color:"#f59e0b",background:"rgba(245,158,11,0.12)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>⏸</span>
+                                ):(
+                                  <span style={{fontSize:9,color:"rgba(0,230,100,0.25)",background:"rgba(0,230,100,0.05)",padding:"2px 7px",borderRadius:4,fontWeight:700}}>PENDING</span>
+                                )}
+                              </div>
+                              <div className="player-name player-name-md name-clamp2" style={{flex:1,color:"#e8f5ee"}}>{m.p2name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    };
+                    const renderAreaSection=(ar,groups)=>{
+                      if(!groups.length)return null;
+                      const jn=JUDGE_NAMES[activeCat];
+                      const judge=jn&&typeof jn==="object"?jn[`area${ar}`]:null;
+                      const sideLabel=DIY_SIDES[activeCat]?.[ar===1?"A":"B"]?.label||`Area ${ar}`;
+                      return(
+                        <div key={ar} style={{marginBottom:8}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",background:`${accent}10`,border:`1px solid ${accent}25`,borderRadius:10,marginBottom:10}}>
+                            <span style={{fontFamily:"'Bebas Neue'",fontSize:16,color:accent,letterSpacing:2}}>AREA {ar}</span>
+                            <span style={{fontSize:11,fontWeight:700,color:accent,opacity:0.8}}>{sideLabel}</span>
+                            {judge&&<span style={{fontSize:10,color:accent,opacity:0.65}}>· 👤 {judge}</span>}
+                            <span style={{marginLeft:"auto",fontSize:9,color:"rgba(0,230,100,0.4)"}}>{groups.length} groups</span>
+                          </div>
+                          {groups.map(renderGroup)}
+                        </div>
+                      );
+                    };
+                    if(isDIY){
+                      const a1=allGrps.filter(g=>(catData.groups[g]?.[0]?.area||1)===1);
+                      const a2=allGrps.filter(g=>(catData.groups[g]?.[0]?.area||0)===2);
+                      return<>{renderAreaSection(1,a1)}{renderAreaSection(2,a2)}</>;
+                    }
+                    return<>{allGrps.map(renderGroup)}</>;
+                  })()}
 
                   {/* STANDINGS */}
-
-                  {pubTab==="standings"&&Object.keys(catData.groups||{}).sort()
-                    .filter(g=>{
-                      if(!DIY_SIDES[activeCat])return true;
-                      const m=catData.matches?.find(mm=>mm.group===g);
-                      if(!m)return true;
-                      return(DIY_SIDES[activeCat][activeSide]?.fields||[]).includes(m.field);
-                    }).map(g=>{
-                    const rows=standings[g]||[];
-                    return(
-                      <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
-                        <div style={{background:`linear-gradient(90deg,${accent}14,transparent)`,padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",alignItems:"center",gap:10}}>
-                          <div style={{width:26,height:26,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:15,color:"#050e08"}}>{g}</div>
-                          <span style={{fontWeight:700,fontSize:13}}>GROUP {g}</span>
-                          {DIY_SIDES[activeCat]&&(
-                            <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:4,marginLeft:4,
-                              background:activeSide==="A"?"rgba(0,230,100,0.1)":"rgba(255,215,0,0.1)",
-                              color:activeSide==="A"?"#00e664":"#ffd700",
-                              border:`1px solid ${activeSide==="A"?"rgba(0,230,100,0.25)":"rgba(255,215,0,0.25)"}`}}>
-                              SIDE {activeSide} · {DIY_SIDES[activeCat][activeSide]?.label}
-                            </span>
-                          )}
-                        </div>
-                        <div style={{overflowX:"auto"}}>
-                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                            <thead><tr style={{borderBottom:"1px solid rgba(0,230,100,0.08)"}}>
-                              {["#","PLAYER","P","W","D","L","GF","GA","GD","PTS"].map(h=>(
-                                <th key={h} style={{padding:"8px 10px",textAlign:h==="PLAYER"?"left":"center",color:"rgba(0,230,100,0.4)",fontSize:9,fontWeight:700,letterSpacing:1.5}}>{h}</th>
-                              ))}
-                            </tr></thead>
-                            <tbody>{rows.map((r,i)=>(
-                              <tr key={r.id} style={{borderBottom:"1px solid rgba(0,230,100,0.03)",background:i<2?`${accent}06`:"transparent"}}>
-                                <td style={{padding:"8px 10px",textAlign:"center",color:i<2?accent:"rgba(0,230,100,0.3)",fontWeight:700,fontSize:13}}>{i+1}</td>
-                                <td style={{padding:"8px 10px",fontWeight:600,fontSize:12}}>
-                                  {i<2&&<span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:accent,marginRight:7,verticalAlign:"middle"}}/>}
-                                  <span className="player-name player-name-sm name-clamp2">{r.name}</span>
-                                </td>
-                                {["P","W","D","L","GF","GA","GD","Pts"].map(k=>(
-                                  <td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:k==="Pts"?700:400,
-                                    color:k==="Pts"?accent:k==="GD"?(r[k]>0?"#10b981":r[k]<0?"#ef4444":"rgba(0,230,100,0.3)"):"rgba(232,245,238,0.45)"}}>{r[k]}</td>
+                  {pubTab==="standings"&&(()=>{
+                    const allGrps=Object.keys(catData.groups||{}).sort();
+                    const isDIY=!!DIY_SIDES[activeCat];
+                    const groupField=g=>groupFieldMaps[activeCat]?.[g]||catData.matches?.find(m=>m.group===g)?.field;
+                    const renderGroup=g=>{
+                      const rows=standings[g]||[];
+                      const fNum=groupField(g);
+                      const grpArea=catData.groups[g]?.[0]?.area;
+                      const sideKey=grpArea===1?"A":grpArea===2?"B":null;
+                      return(
+                        <div key={g} style={{background:S1,border:"1px solid rgba(0,230,100,0.08)",borderRadius:14,marginBottom:12,overflow:"hidden"}}>
+                          <div style={{background:`linear-gradient(90deg,${accent}14,transparent)`,padding:"10px 16px",borderBottom:"1px solid rgba(0,230,100,0.06)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                            <div style={{width:26,height:26,borderRadius:6,background:accent,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:15,color:"#050e08"}}>{g}</div>
+                            <span style={{fontWeight:700,fontSize:13}}>GROUP {g}</span>
+                            {fNum&&<span style={{fontSize:9,fontWeight:700,color:accent,background:`${accent}12`,border:`1px solid ${accent}25`,padding:"2px 8px",borderRadius:4}}>{fieldCfg.label} {fNum}</span>}
+                            {sideKey&&DIY_SIDES[activeCat]&&(
+                              <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:4,
+                                background:sideKey==="A"?"rgba(0,230,100,0.1)":"rgba(255,215,0,0.1)",
+                                color:sideKey==="A"?"#00e664":"#ffd700",
+                                border:`1px solid ${sideKey==="A"?"rgba(0,230,100,0.25)":"rgba(255,215,0,0.25)"}`}}>
+                                AREA {sideKey==="A"?1:2} · {DIY_SIDES[activeCat][sideKey]?.label}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{overflowX:"auto"}}>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                              <thead><tr style={{borderBottom:"1px solid rgba(0,230,100,0.08)"}}>
+                                {["#","PLAYER","P","W","D","L","GF","GA","GD","PTS"].map(h=>(
+                                  <th key={h} style={{padding:"8px 10px",textAlign:h==="PLAYER"?"left":"center",color:"rgba(0,230,100,0.4)",fontSize:9,fontWeight:700,letterSpacing:1.5}}>{h}</th>
                                 ))}
-                              </tr>
-                            ))}</tbody>
-                          </table>
+                              </tr></thead>
+                              <tbody>{rows.map((r,i)=>(
+                                <tr key={r.id} style={{borderBottom:"1px solid rgba(0,230,100,0.03)",background:i<2?`${accent}06`:"transparent"}}>
+                                  <td style={{padding:"8px 10px",textAlign:"center",color:i<2?accent:"rgba(0,230,100,0.3)",fontWeight:700,fontSize:13}}>{i+1}</td>
+                                  <td style={{padding:"8px 10px",fontWeight:600,fontSize:12}}>
+                                    {i<2&&<span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:accent,marginRight:7,verticalAlign:"middle"}}/>}
+                                    <span className="player-name player-name-sm name-clamp2">{r.name}</span>
+                                  </td>
+                                  {["P","W","D","L","GF","GA","GD","Pts"].map(k=>(
+                                    <td key={k} style={{padding:"8px 10px",textAlign:"center",fontWeight:k==="Pts"?700:400,
+                                      color:k==="Pts"?accent:k==="GD"?(r[k]>0?"#10b981":r[k]<0?"#ef4444":"rgba(0,230,100,0.3)"):"rgba(232,245,238,0.45)"}}>{r[k]}</td>
+                                  ))}
+                                </tr>
+                              ))}</tbody>
+                            </table>
+                          </div>
+                          <div style={{padding:"6px 14px",fontSize:9,color:"rgba(0,230,100,0.3)",borderTop:"1px solid rgba(0,230,100,0.04)"}}>
+                            🟢 Top 2 advance · <strong style={{color:accent}}>{rows[0]?.name}</strong> &amp; <strong style={{color:accent}}>{rows[1]?.name}</strong>
+                          </div>
                         </div>
-                        <div style={{padding:"6px 14px",fontSize:9,color:"rgba(0,230,100,0.3)",borderTop:"1px solid rgba(0,230,100,0.04)"}}>
-                          🟢 Top 2 advance · <strong style={{color:accent}}>{rows[0]?.name}</strong> &amp; <strong style={{color:accent}}>{rows[1]?.name}</strong>
+                      );
+                    };
+                    const renderAreaSection=(ar,groups)=>{
+                      if(!groups.length)return null;
+                      const jn=JUDGE_NAMES[activeCat];
+                      const judge=jn&&typeof jn==="object"?jn[`area${ar}`]:null;
+                      const sideLabel=DIY_SIDES[activeCat]?.[ar===1?"A":"B"]?.label||`Area ${ar}`;
+                      return(
+                        <div key={ar} style={{marginBottom:8}}>
+                          <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",background:`${accent}10`,border:`1px solid ${accent}25`,borderRadius:10,marginBottom:10}}>
+                            <span style={{fontFamily:"'Bebas Neue'",fontSize:16,color:accent,letterSpacing:2}}>AREA {ar}</span>
+                            <span style={{fontSize:11,fontWeight:700,color:accent,opacity:0.8}}>{sideLabel}</span>
+                            {judge&&<span style={{fontSize:10,color:accent,opacity:0.65}}>· 👤 {judge}</span>}
+                            <span style={{marginLeft:"auto",fontSize:9,color:"rgba(0,230,100,0.4)"}}>{groups.length} groups</span>
+                          </div>
+                          {groups.map(renderGroup)}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    };
+                    if(isDIY){
+                      const a1=allGrps.filter(g=>(catData.groups[g]?.[0]?.area||1)===1);
+                      const a2=allGrps.filter(g=>(catData.groups[g]?.[0]?.area||0)===2);
+                      return<>{renderAreaSection(1,a1)}{renderAreaSection(2,a2)}</>;
+                    }
+                    return<>{allGrps.map(renderGroup)}</>;
+                  })()}
 
 
                   {/* ── PLAYER SEARCH BAR — hidden on TEAMS tab ── */}
