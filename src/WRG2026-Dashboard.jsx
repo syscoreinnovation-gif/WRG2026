@@ -2052,6 +2052,28 @@ export default function WRGDashboard(){
                     {/* Manual Group Assignment (non-DIY) */}
                     {setupCat&&!DIY_CATS.includes(setupCat)&&(()=>{
                       const cat=CATEGORIES.find(c=>c.id===setupCat);
+                      // Team categories: group assignments live in the Teams tab (teamGroups),
+                      // not here. Show a clear redirect instead of the individual-student list.
+                      if(TEAM_CATEGORIES[setupCat]){
+                        const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(setupCat));
+                        const assigned=catTeams.filter(p=>teamGroups[p.id]);
+                        return(
+                          <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${cat.color}20`,borderRadius:12,padding:20,textAlign:"center"}}>
+                            <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color:cat.color,letterSpacing:2,marginBottom:8}}>{cat.icon} {cat.name}</div>
+                            <div style={{fontSize:13,color:"rgba(0,230,100,0.7)",marginBottom:6}}>
+                              ✓ Group assignment for team categories is done in the <strong>Teams</strong> tab.
+                            </div>
+                            <div style={{fontSize:11,color:"rgba(0,230,100,0.4)"}}>
+                              {catTeams.length} team{catTeams.length!==1?"s":""} registered · {assigned.length} assigned to groups · {catTeams.length-assigned.length} unassigned
+                            </div>
+                            {catTeams.length-assigned.length>0&&(
+                              <div style={{marginTop:8,fontSize:11,color:"#f59e0b"}}>
+                                ⚠ {catTeams.length-assigned.length} team{catTeams.length-assigned.length!==1?"s":""} not yet assigned to a group — go to Teams tab to sort them.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
                       const ppts=getParticipantsForCat(setupCat);
                       const assignments=manualGroups[setupCat]||{};
                       const unassigned=ppts.filter(p=>!assignments[p.id]);
