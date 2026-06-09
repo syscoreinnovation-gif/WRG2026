@@ -128,7 +128,12 @@ function generateTournament(participants,groupFieldMaps,manualGroups,diyAreas){
   const DIY_CATS_LOCAL=["diy-p","diy-s"];
   const L="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   CATEGORIES.forEach(cat=>{
-    const present=participants.filter(p=>p.attendance==="present"&&p.categories.includes(cat.id));
+    const isTeamCat=!!TEAM_CATEGORIES[cat.id];
+    // Team categories use registered team records (no attendance check — all registered teams compete).
+    // Individual categories use individuals with attendance=present (exclude team records).
+    const present=isTeamCat
+      ?participants.filter(p=>p.isTeam&&p.categories.includes(cat.id))
+      :participants.filter(p=>!p.isTeam&&p.attendance==="present"&&p.categories.includes(cat.id));
     if(!present.length){catData[cat.id]={groups:{},matches:[]};return;}
 
     // ── Manual group assignment (non-DIY) ─────────────────
@@ -789,8 +794,22 @@ export default function WRGDashboard(){
     saveState({participants:updated,groupFieldMaps,tournamentData:data});
   }
   function generateTournamentHandler(){
-    if(presentCount===0){showFlash("⚠ No participants marked present");return;}
-    const tournament=generateTournament(participants,groupFieldMaps,manualGroups,diyAreas);
+    if(presentCount===0&&!participants.some(p=>p.isTeam)){showFlash("⚠ No participants marked present");return;}
+    // Merge team-tab group assignments (teamGroups) into manualGroups for team categories.
+    // teamGroups: {teamId: "A"|"B"...} — convert to {catId: {teamId: letter}} format.
+    const merged={...manualGroups};
+    Object.entries(teamGroups).forEach(([teamId,grp])=>{
+      if(!grp)return;
+      const team=participants.find(p=>p.id===teamId);
+      if(!team?.isTeam)return;
+      team.categories.forEach(catId=>{
+        if(TEAM_CATEGORIES[catId]){
+          if(!merged[catId])merged[catId]={};
+          merged[catId][teamId]=grp;
+        }
+      });
+    });
+    const tournament=generateTournament(participants,groupFieldMaps,merged,diyAreas);
     setData(tournament);
     saveState({participants,groupFieldMaps,tournamentData:tournament});
     setAdminTab("overview");showFlash("🏆 Tournament is LIVE!");
@@ -3020,8 +3039,11 @@ function TeamsListView({catId,participants,teamGroups,setTeamGroups,markAttendan
 
   const usedGroups=[...new Set(catTeams.map(t=>teamGroups[t.id]).filter(Boolean))].sort();
   const allLetters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-  const nextGrp=allLetters.find(l=>!usedGroups.includes(l))||"A";
-  const showGrps=usedGroups.length>0?[...usedGroups,nextGrp]:[nextGrp];
+  // Show all expected groups at once so teams can be sorted freely without unlocking one by one.
+  // Floor: 4 groups (always visible); also show expected count for this roster + 1 buffer.
+  const expectedCount=calcGroupSizesFor(catId,catTeams.length).length;
+  const visibleCount=Math.max(expectedCount+1, usedGroups.length+1, 4);
+  const showGrps=allLetters.slice(0,visibleCount);
 
   return(
     <div style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${accent}20`,borderRadius:12,overflow:"hidden"}}>
