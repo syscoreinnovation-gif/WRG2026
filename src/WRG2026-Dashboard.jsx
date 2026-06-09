@@ -563,6 +563,7 @@ export default function WRGDashboard(){
   const absentCount=participants.filter(p=>p.attendance==="absent").length;
   const unmarkedCount=participants.filter(p=>!p.attendance).length;
   const attFiltered=useMemo(()=>participants
+    .filter(p=>!p.isTeam)
     .filter(p=>p.name.toLowerCase().includes(searchQ.toLowerCase())||(p.studentId||"").toLowerCase().includes(searchQ.toLowerCase()))
     .filter(p=>!catFilter||p.categories.includes(catFilter))
     .filter(p=>attFilter==="all"||(attFilter==="present"&&p.attendance==="present")||(attFilter==="absent"&&p.attendance==="absent")||(attFilter==="unmarked"&&!p.attendance))
