@@ -500,10 +500,13 @@ export default function WRGDashboard(){
   const saveState = async (stateData) => {
     try {
       await setDoc(STATE_REF, {
-        participants: stateData.participants || [],
-        groupFieldMaps: stateData.groupFieldMaps || {},
-        tournamentData: stateData.tournamentData || null,
-        knockoutData: stateData.knockoutData || {},
+        participants:   stateData.participants   ?? participants,
+        groupFieldMaps: stateData.groupFieldMaps ?? groupFieldMaps,
+        tournamentData: "tournamentData" in stateData ? stateData.tournamentData : data,
+        knockoutData:   stateData.knockoutData   ?? knockoutData,
+        teamGroups:     stateData.teamGroups     ?? teamGroups,
+        manualGroups:   stateData.manualGroups   ?? manualGroups,
+        diyAreas:       stateData.diyAreas       ?? diyAreas,
         updatedAt: Date.now()
       });
     } catch(e) {
@@ -521,6 +524,9 @@ export default function WRGDashboard(){
         if(d.groupFieldMaps) setGroupFieldMaps(d.groupFieldMaps);
         setData(d.tournamentData || null);
         if(d.knockoutData) setKnockoutData(d.knockoutData);
+        if(d.teamGroups)   setTeamGroups(d.teamGroups);
+        if(d.manualGroups) setManualGroups(d.manualGroups);
+        if(d.diyAreas)     setDiyAreas(d.diyAreas);
       } else {
         // First time — initialise with empty state
         setParticipants([]);
@@ -1875,8 +1881,8 @@ export default function WRGDashboard(){
                     const catTeams=participants.filter(p=>p.isTeam&&p.categories.includes(teamForm.category));
                     const usedG=[...new Set(catTeams.map(t=>teamGroups[t.id]).filter(Boolean))].sort();
                     const allL="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-                    const nextG=allL.find(l=>!usedG.includes(l))||"A";
-                    const showG=usedG.length>0?[...usedG,nextG]:[nextG];
+                    const expCount=calcGroupSizesFor(teamForm.category,catTeams.length).length;
+                    const showG=allL.slice(0,Math.max(expCount+1,usedG.length+1,4));
                     return(
                       <div key={team.id} style={{background:"rgba(5,14,8,0.8)",border:`1px solid ${accent2}15`,borderRadius:10,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10}}>
                         <div style={{width:26,height:26,borderRadius:5,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Bebas Neue'",fontSize:14,background:grp?`${accent2}20`:"rgba(0,0,0,0.3)",color:grp?accent2:"rgba(0,230,100,0.2)",border:`1px solid ${grp?accent2+"40":"rgba(0,230,100,0.08)"}`}}>{grp||"?"}</div>
@@ -1893,7 +1899,11 @@ export default function WRGDashboard(){
                         <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
                           <div style={{display:"flex",gap:2}}>
                             {showG.map(l=>(
-                              <button key={l} className="hbtn" onClick={()=>setTeamGroups(prev=>({...prev,[team.id]:grp===l?null:l}))}
+                              <button key={l} className="hbtn" onClick={()=>{
+                                const newGrps={...teamGroups,[team.id]:grp===l?null:l};
+                                setTeamGroups(newGrps);
+                                saveState({teamGroups:newGrps});
+                              }}
                                 style={{padding:"3px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",background:grp===l?`${accent2}25`:"transparent",border:`1px solid ${grp===l?accent2:"rgba(0,230,100,0.15)"}`,color:grp===l?accent2:"rgba(0,230,100,0.3)"}}>
                                 {l}
                               </button>
@@ -2257,7 +2267,14 @@ export default function WRGDashboard(){
                           <div style={{fontFamily:"'Bebas Neue'",fontSize:"clamp(18px,2.5vw,24px)",color:"#10b981",letterSpacing:2}}>🏆 TOURNAMENT IS LIVE</div>
                           <div style={{fontSize:12,color:"rgba(0,230,100,0.4)",marginTop:4}}>{presentCount} participants confirmed</div>
                         </div>
-                        <button className="hbtn" style={{padding:"9px 18px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,color:"#ef4444",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={resetTournament}>🔄 RESET</button>
+                        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                          <button className="hbtn"
+                            style={{padding:"9px 18px",background:"rgba(0,230,100,0.08)",border:"1px solid rgba(0,230,100,0.25)",borderRadius:8,color:"#00e664",fontWeight:700,fontSize:12,cursor:"pointer"}}
+                            onClick={generateTournamentHandler}>
+                            ⚡ REGENERATE
+                          </button>
+                          <button className="hbtn" style={{padding:"9px 18px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:8,color:"#ef4444",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={resetTournament}>🔄 RESET</button>
+                        </div>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
                         {CATEGORIES.map(c=>{
