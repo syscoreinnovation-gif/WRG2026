@@ -1664,7 +1664,7 @@ export default function WRGDashboard(){
                   {pubTab==="bracket"&&(
                     <LiveKnockoutBracket catId={activeCat} knockoutData={knockoutData} cat={cat} accent={accent} G={G} S1={S1}
                       onScoreMatch={(roundIdx,matchIdx)=>{setKoScoreModal({catId:activeCat,roundIdx,matchIdx});setKoScoreInput({s1:"",s2:""});}}
-                      isAdmin={view==="admin"||view==="judge"}
+                      isAdmin={auth.admin||auth.judge}
                       onGenerateKnockout={()=>triggerGenerateKnockout(activeCat)}
                       groupStageComplete={catMatches.length>0&&catMatches.every(m=>m.status==="completed")}/>
                   )}
