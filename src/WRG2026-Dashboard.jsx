@@ -516,7 +516,7 @@ export default function WRGDashboard(){
         participants:   stateData.participants   ?? participants,
         groupFieldMaps: stateData.groupFieldMaps ?? groupFieldMaps,
         tournamentData: "tournamentData" in stateData ? stateData.tournamentData : data,
-        knockoutData:   stateData.knockoutData   ?? knockoutData,
+        knockoutData:   JSON.stringify(stateData.knockoutData ?? knockoutData),
         teamGroups:     stateData.teamGroups     ?? teamGroups,
         manualGroups:   stateData.manualGroups   ?? manualGroups,
         diyAreas:       stateData.diyAreas       ?? diyAreas,
@@ -536,7 +536,10 @@ export default function WRGDashboard(){
         if(d.participants) setParticipants(d.participants);
         if(d.groupFieldMaps) setGroupFieldMaps(d.groupFieldMaps);
         setData(d.tournamentData || null);
-        if(d.knockoutData) setKnockoutData(d.knockoutData);
+        if(d.knockoutData){
+          try{ setKnockoutData(typeof d.knockoutData==="string"?JSON.parse(d.knockoutData):d.knockoutData); }
+          catch(err){ console.error("knockoutData parse failed:",err); }
+        }
         if(d.teamGroups)   setTeamGroups(d.teamGroups);
         if(d.manualGroups) setManualGroups(d.manualGroups);
         if(d.diyAreas)     setDiyAreas(d.diyAreas);
@@ -2859,7 +2862,7 @@ function LiveKnockoutBracket({catId,knockoutData,cat,accent,G,S1,onScoreMatch,is
               </div>
               {/* Matches */}
               {round.map((m,mi)=>{
-                const canScore=isAdmin&&m.status==="pending"&&m.p1&&m.p2;
+                const canScore=isAdmin&&m.p1&&m.p2&&m.status!=="completed"&&m.status!=="bye";
                 const isFinal=isLastRound;
                 return(
                   <div key={m.id} style={{
